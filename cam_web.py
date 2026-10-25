@@ -13,7 +13,6 @@ app = Flask(__name__)
 frames = {"cam1": None, "cam2": None}
 status = {"cam1": "Starting", "cam2": "Starting"}
 lock = threading.Lock()
-cameras = []
 
 
 def capture_camera(name, camera_num):
@@ -31,7 +30,6 @@ def capture_camera(name, camera_num):
             status[name] = "Configured"
 
         camera.start()
-        cameras.append(camera)
 
         with lock:
             status[name] = "Running"
