@@ -1,0 +1,26 @@
+body {
+  margin: 0;
+  padding: 1.5rem;
+  background: #f4f6f8;
+  color: #1f2933;
+  font-family: Arial, sans-serif;
+}
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+.video-feed {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+a {
+  color: #0969da;
+}

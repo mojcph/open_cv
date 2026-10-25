@@ -1,7 +1,7 @@
 import cv2
 import threading
 import time
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, render_template
 from picamera2 import Picamera2
 
 WIDTH = 640
@@ -108,16 +108,7 @@ of each camera.
 '''
 @app.route("/")
 def index():
-    return """
-    <html>
-      <head><title>Pi Camera Preview</title></head>
-      <body>
-        <h2>Raspberry Pi 5 - Dual Camera</h2>
-        <img src="/video" style="width:100%;max-width:1280px">
-        <p><a href="/status">Camera status</a></p>
-      </body>
-    </html>
-    """
+    return render_template("index.html")
 
 '''
 @brief Flask route for the video stream. It returns a multipart response
