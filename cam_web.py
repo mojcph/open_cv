@@ -14,7 +14,16 @@ frames = {"cam1": None, "cam2": None}
 status = {"cam1": "Starting", "cam2": "Starting"}
 lock = threading.Lock()
 
-
+'''
+@brief This script captures video from two Raspberry Pi cameras 
+using the Picamera2 library and streams the combined video feed 
+via a Flask web server. It initializes each camera, configures 
+them for video capture, and starts separate threads to continuously 
+capture frames. The captured frames are converted from RGB to BGR 
+format for OpenCV compatibility and stored in a shared dictionary. 
+The Flask server provides endpoints to view the live video stream 
+and check the status of each camera.
+'''
 def capture_camera(name, camera_num):
     camera = None
 
@@ -58,7 +67,13 @@ def capture_camera(name, camera_num):
             except Exception:
                 pass
 
-
+'''
+@brief Generates a continuous stream of JPEG-encoded frames
+from the two cameras, concatenated side by side.
+This function is used by the Flask route to provide a live video feed.
+It checks if frames from both cameras are available, combines them,
+and yields the resulting JPEG image.
+'''
 def generate_stream():
     while True:
         with lock:
@@ -86,7 +101,11 @@ def generate_stream():
         else:
             time.sleep(0.05)
 
-
+'''
+@brief Flask route for the main page, displaying the live video feed
+from both cameras side by side. It includes a link to check the status 
+of each camera.
+'''
 @app.route("/")
 def index():
     return """
@@ -100,7 +119,11 @@ def index():
     </html>
     """
 
-
+'''
+@brief Flask route for the video stream. It returns a multipart response
+that continuously sends JPEG-encoded frames from the two cameras.
+This allows the client to display a live video feed in a web browser.
+'''
 @app.route("/video")
 def video():
     return Response(
@@ -108,13 +131,19 @@ def video():
         mimetype="multipart/x-mixed-replace; boundary=frame"
     )
 
-
+'''
+@brief Flask route for checking the status of each camera.
+It returns a JSON response containing the current status of both cameras,
+such as "Starting", "Configured", "Running", or any error messages.
+'''
 @app.route("/status")
 def camera_status():
     with lock:
         return jsonify(status)
 
-
+'''
+@brief Main entry point of the script. It initializes and starts the camera threads.
+'''
 if __name__ == "__main__":
     for name, camera_num in [("cam1", 0), ("cam2", 1)]:
         thread = threading.Thread(
@@ -141,4 +170,3 @@ if __name__ == "__main__":
         debug=False,
         use_reloader=False,
     )
-    
