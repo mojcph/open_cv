@@ -51,7 +51,7 @@ def capture_camera(name, camera_num):
             with lock:
                 frames[name] = frame
 
-    except Exception as exc:
+    except (RuntimeError, OSError, ValueError, TypeError, cv2.error) as exc:
         with lock:
             status[name] = f"ERROR: {exc}"
         print(f"{name}: {exc}", flush=True)
@@ -60,12 +60,12 @@ def capture_camera(name, camera_num):
         if camera is not None:
             try:
                 camera.stop()
-            except Exception:
-                pass
+            except (RuntimeError, OSError, ValueError) as e:
+                print(f"Error stopping camera: {e}", flush=True)
             try:
                 camera.close()
-            except Exception:
-                pass
+            except (RuntimeError, OSError, ValueError) as e:
+                print(f"Error closing camera: {e}", flush=True)
 
 '''
 @brief Generates a continuous stream of JPEG-encoded frames
