@@ -1,6 +1,7 @@
-import cv2
 import threading
 import time
+
+import cv2
 from flask import Flask, Response, jsonify, render_template
 from picamera2 import Picamera2
 
