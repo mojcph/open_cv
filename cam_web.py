@@ -47,8 +47,7 @@ def capture_camera(name, camera_num):
         print(f"{name}: camera {camera_num} started", flush=True)
 
         while True:
-            rgb = camera.capture_array()
-            frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            frame = camera.capture_array()
             with lock:
                 frames[name] = frame
 
