@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stereovision"
+version = "0.1.0"
+description = "Dual Pi camera stereo distance measurement"
+requires-python = ">=3.11"
+# picamera2 is installed from apt (python3-picamera2); the venv uses --system-site-packages.
+dependencies = [
+    "Flask>=3.1",
+    "numpy>=2.0",
+    "opencv-python>=4.8",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stereovision = ["web/templates/*", "web/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-m 'not hardware'"
+markers = [
+    "hardware: needs the physical Pi cameras (run with: pytest -m hardware)",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

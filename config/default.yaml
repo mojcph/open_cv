@@ -1,0 +1,13 @@
+# Runtime configuration for the stereo rig.
+camera:
+  width: 640
+  height: 480
+  rotation: ccw90        # none | cw90 | ccw90 | 180 — applied before anything else
+  left_index: 0          # Picamera2 camera number for the left image
+  right_index: 1
+  swap_left_right: true  # true = swap the two cameras (camera 0 is physically on the right)
+
+web:
+  host: 127.0.0.1
+  port: 5000
+  jpeg_quality: 80

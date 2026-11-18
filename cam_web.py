@@ -9,7 +9,12 @@ WIDTH = 640
 HEIGHT = 480
 JPEG_QUALITY = 80
 
-app = Flask(__name__)
+# Legacy proof-of-concept; superseded by scripts/run_web.py.
+app = Flask(
+    __name__,
+    template_folder="src/stereovision/web/templates",
+    static_folder="src/stereovision/web/static",
+)
 
 frames = {"cam1": None, "cam2": None}
 status = {"cam1": "Starting", "cam2": "Starting"}
