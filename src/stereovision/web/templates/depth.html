@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Depth</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <h1>Distance measurement</h1>
+      <img id="feed" class="video-feed clickable" src="{{ url_for('depth.video') }}"
+           alt="Rectified left image with crosshair, and depth heatmap">
+      <div class="controls">
+        <span class="readout">Distance: <strong id="distance">–</strong></span>
+        <span>Depth rate: <span id="fps">–</span> fps</span>
+        <span>Valid pixels: <span id="valid">–</span></span>
+        <button id="centre" type="button" class="secondary">Centre</button>
+      </div>
+      <p id="message" class="message error" role="status"></p>
+      <p>Click either image to measure at that point (median over a small circle).
+        Heatmap: red = near ({{ (min_mm / 1000) | round(2) }} m), blue = far
+        ({{ (max_mm / 1000) | round(1) }} m), black = no depth (plain surfaces with no texture,
+        or areas only one camera sees). Closest measurable distance: about
+        {{ (closest_mm / 1000) | round(2) }} m.</p>
+      <p><a href="{{ url_for('index') }}">Back to live view</a></p>
+    </main>
+    <script>
+      const feed = document.getElementById("feed");
+
+      async function setPoint(fx, fy) {
+        await fetch("{{ url_for('depth.set_point') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fx, fy }),
+        });
+      }
+
+      feed.addEventListener("click", (e) => {
+        const rect = feed.getBoundingClientRect();
+        const half = rect.width / 2;           // left image | heatmap
+        const x = (e.clientX - rect.left) % half;
+        setPoint(x / half, (e.clientY - rect.top) / rect.height);
+      });
+      document.getElementById("centre").addEventListener("click", () => setPoint(0.5, 0.5));
+
+      function fmt(mm) {
+        if (mm === null) return "no depth";
+        return mm >= 1000 ? (mm / 1000).toFixed(2) + " m" : Math.round(mm) + " mm";
+      }
+
+      async function poll() {
+        try {
+          const m = await (await fetch("{{ url_for('depth.get_measure') }}")).json();
+          document.getElementById("distance").textContent = fmt(m.distance_mm);
+          document.getElementById("fps").textContent = m.fps;
+          document.getElementById("valid").textContent =
+            m.valid_fraction === undefined ? "–" : Math.round(m.valid_fraction * 100) + "%";
+          document.getElementById("message").textContent = m.error || "";
+        } catch (e) { /* server restarting */ }
+        setTimeout(poll, 300);
+      }
+      poll();
+    </script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 """Start the dual-camera web stream. Run on the Pi: python scripts/run_web.py [config.yaml]
 
 Pages: /  live view,  /calibrate  calibration capture,  /rectified  calibration check,
-       /status  camera state (JSON).
+       /depth  distance measurement,  /status  camera state (JSON).
 """
 
 import argparse
@@ -13,6 +13,7 @@ from stereovision.calibration.io import camera_mismatch, load_calibration
 from stereovision.camera.picam import PicamSource
 from stereovision.camera.stereo_rig import StereoRig
 from stereovision.config import DEFAULT_CONFIG_PATH, CameraConfig, load_config
+from stereovision.depth.engine import DepthEngine, DepthWorker
 from stereovision.depth.rectify import Rectifier
 from stereovision.web.app import create_app
 
@@ -68,12 +69,20 @@ def main() -> None:
     meta = capture_meta(cam, cfg.board)
     store = CaptureStore(args.captures, meta)
     rectifier = load_rectifier(args.calibration, meta["camera"])
+    depth_worker = None
+    if rectifier is not None:
+        depth_worker = DepthWorker(rig, DepthEngine.from_rectifier(rectifier, cfg.depth))
     rig.start()
+    if depth_worker is not None:
+        depth_worker.start()
     try:
         app = create_app(rig, cfg.web.jpeg_quality, board=make_board(cfg.board), store=store,
-                         preview_scale=cfg.web.preview_scale, rectifier=rectifier)
+                         preview_scale=cfg.web.preview_scale, rectifier=rectifier,
+                         depth_worker=depth_worker, depth_cfg=cfg.depth)
         app.run(host=cfg.web.host, port=cfg.web.port, threaded=True, use_reloader=False)
     finally:
+        if depth_worker is not None:
+            depth_worker.stop()
         rig.stop()
 
 

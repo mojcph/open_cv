@@ -13,7 +13,7 @@ keeps their frames about 0.02 ms apart. The code is organised as a testable Pyth
 | 1 | Restructure into a package, config file, pytest | ✅ done |
 | 2 | Lock focus and sensor mode, sync cameras, pair frames by timestamp | ✅ done |
 | 3 | Stereo calibration (ChArUco): board, capture, calibrate, rectified check | ✅ code done — needs a real capture set |
-| 4 | Depth map and distance measurement | planned |
+| 4 | Depth map and distance measurement | ✅ code done — tape-measure check after real calibration |
 | 5 | YOLO-E object detection with distance labels | planned |
 
 ## Setup (on the Pi)
@@ -108,6 +108,23 @@ Restart `run_web.py` to load the new calibration, then open **/rectified**. With
 calibration, each feature sits on the same green line in both images. The calibration is
 only loaded if it was made with the current camera settings.
 
+## Distance measurement
+
+Needs a valid `calibration/stereo.npz`. Open **/depth**:
+
+- Left: the rectified left image with a crosshair and the distance at that point (median over
+  a small circle). Right: the depth heatmap (red = near, blue = far, black = no depth).
+- Click either image to move the crosshair. **Centre** resets it.
+- Depth is computed at `depth.scale` (default half resolution, about 6 frames/s on a Pi 5) in
+  one background thread. It pauses when no depth page is open.
+- No depth on plain, textureless surfaces, or in the band down the left edge that only the
+  left camera sees.
+- Closest measurable distance ≈ focal × scale × baseline / `num_disparities`, about 0.43 m
+  with the defaults. Raise `num_disparities` to measure closer, at the cost of speed.
+
+Expected accuracy with the 87 mm baseline: about 1 cm at 1 m, about 5 cm at 3 m. The error
+grows with distance². Check it with a tape measure at 0.5, 1, 2 and 3 m.
+
 ## Configuration — `config/default.yaml`
 
 | Key | Meaning |
@@ -124,6 +141,7 @@ only loaded if it was made with the current camera settings.
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
 | `web.preview_scale` | Size of the browser stream (0.5 = half). Capture and processing always use full resolution. |
 | `board.*` | ChArUco board: squares, measured square/marker size in mm, ArUco dictionary |
+| `depth.*` | Stereo matching: working `scale`, `num_disparities` (search range), `block_size`, SGBM `mode`, heatmap range, measurement radius |
 
 The sensor mode, focus and output size must stay the same between calibration (Phase 3)
 and measuring.
@@ -157,6 +175,10 @@ src/stereovision/
   calibration/calibrate.py    intrinsics, stereo extrinsics, rectification, report
   calibration/io.py           save/load calibration .npz, camera settings check
   depth/rectify.py            Rectifier (remap tables), epipolar guide lines
+  depth/disparity.py          StereoSGBM matcher, disparity at working scale
+  depth/measure.py            disparity -> depth, point/box distance, heatmap
+  depth/engine.py             DepthEngine (per frame), DepthWorker (background thread)
+  web/depth.py                /depth page: crosshair distance, heatmap, click to measure
   web/stream.py               MJPEG streaming helpers
   web/calibrate.py            /calibrate page: overlay stream, capture, delete last
   web/app.py                  Flask app: /, /video (MJPEG), /status, registers /calibrate

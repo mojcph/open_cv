@@ -85,11 +85,45 @@ class BoardConfig:
             raise ValueError(f"dictionary must be an ArUco DICT_* name, got {self.dictionary!r}")
 
 
+SGBM_MODES = ("sgbm", "3way", "hh")
+
+
+@dataclass(frozen=True)
+class DepthConfig:
+    """Stereo matching (OpenCV StereoSGBM) and distance display settings."""
+
+    scale: float = 0.5            # match on images shrunk by this factor (speed vs detail)
+    num_disparities: int = 128    # search range at the working scale; multiple of 16
+    block_size: int = 5           # odd, 3-11; larger = smoother, fewer details
+    uniqueness_ratio: int = 10
+    speckle_window: int = 100
+    speckle_range: int = 2
+    mode: str = "3way"
+    display_min_mm: float = 300.0   # heatmap colour range
+    display_max_mm: float = 3000.0
+    measure_radius_px: int = 8      # full-resolution pixels around the measured point
+
+    def __post_init__(self) -> None:
+        if not 0.1 <= self.scale <= 1.0:
+            raise ValueError("depth.scale must be between 0.1 and 1.0")
+        if self.num_disparities <= 0 or self.num_disparities % 16:
+            raise ValueError("depth.num_disparities must be a positive multiple of 16")
+        if self.block_size < 1 or self.block_size % 2 == 0:
+            raise ValueError("depth.block_size must be odd")
+        if self.mode not in SGBM_MODES:
+            raise ValueError(f"depth.mode must be one of {SGBM_MODES}")
+        if not 0 < self.display_min_mm < self.display_max_mm:
+            raise ValueError("depth.display_min_mm must be positive and below display_max_mm")
+        if self.measure_radius_px < 1:
+            raise ValueError("depth.measure_radius_px must be at least 1")
+
+
 @dataclass(frozen=True)
 class Config:
     camera: CameraConfig = field(default_factory=CameraConfig)
     web: WebConfig = field(default_factory=WebConfig)
     board: BoardConfig = field(default_factory=BoardConfig)
+    depth: DepthConfig = field(default_factory=DepthConfig)
 
 
 def _build(cls: type, data: dict[str, Any] | None):
@@ -104,11 +138,12 @@ def _build(cls: type, data: dict[str, Any] | None):
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     with open(path, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh) or {}
-    unknown = set(raw) - {"camera", "web", "board"}
+    unknown = set(raw) - {"camera", "web", "board", "depth"}
     if unknown:
         raise ValueError(f"unknown config sections: {sorted(unknown)}")
     return Config(
         camera=_build(CameraConfig, raw.get("camera")),
         web=_build(WebConfig, raw.get("web")),
         board=_build(BoardConfig, raw.get("board")),
+        depth=_build(DepthConfig, raw.get("depth")),
     )

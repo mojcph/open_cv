@@ -14,6 +14,7 @@
         <a href="{{ url_for('camera_status') }}">Camera status</a>
         {% if calibration_enabled %} · <a href="{{ url_for('calibrate.page') }}">Calibration capture</a>{% endif %}
         {% if rectified_enabled %} · <a href="{{ url_for('rectified') }}">Rectified view</a>{% endif %}
+        {% if depth_enabled %} · <a href="{{ url_for('depth.page') }}">Distance</a>{% endif %}
       </p>
     </main>
   </body>

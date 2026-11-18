@@ -58,3 +58,11 @@ button.secondary {
 .message.error {
   color: #cf222e;
 }
+
+.clickable {
+  cursor: crosshair;
+}
+
+.readout {
+  font-size: 1.25rem;
+}
