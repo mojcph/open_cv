@@ -12,7 +12,7 @@ keeps their frames about 0.02 ms apart. The code is organised as a testable Pyth
 |-------|------|--------|
 | 1 | Restructure into a package, config file, pytest | ✅ done |
 | 2 | Lock focus and sensor mode, sync cameras, pair frames by timestamp | ✅ done |
-| 3 | Stereo calibration (checkerboard / ChArUco) | planned |
+| 3 | Stereo calibration (ChArUco): board, capture, calibrate, rectified check | ✅ code done — needs a real capture set |
 | 4 | Depth map and distance measurement | planned |
 | 5 | YOLO-E object detection with distance labels | planned |
 
@@ -74,12 +74,39 @@ A4 landscape.
 3. Detected corners are drawn on both images. The count turns green when the pair is usable:
    the board is seen by both cameras, with at least 8 common corners.
 4. Press **Capture pair** or the space bar. **Delete last** removes a bad pair.
+   Or turn on **Auto capture**: it saves a pair when the board is visible in both images,
+   the image has been still for a moment (no motion blur), and the pose differs clearly from
+   every pair already saved. Move to a pose, hold still for about 1 s, then move on. Auto
+   capture runs while the /calibrate page is open.
 5. Collect 20–30 pairs: cover the centre, the corners and the edges of the image, vary the
    distance (0.5–1.5 m) and the tilt (up to ~45°), and hold still.
 
 Pairs are saved as PNG to `calibration/captures/` (`000_left.png`, `000_right.png`, …),
 with `meta.json` recording the camera and board settings. To start over, delete that folder.
 `--captures <folder>` selects another folder, e.g. one per board.
+
+## Calibrate
+
+```bash
+.venv/bin/python scripts/calibrate.py calibration/captures   # -> calibration/stereo.npz
+```
+
+The script reads the board settings from the captures folder's `meta.json`, then calibrates
+each camera, then the pair, and prints a report:
+
+| Line | Good result |
+|------|-------------|
+| `RMS left / right`, `RMS stereo` | below 0.5 px |
+| `focal left / right` | about 1254 px at 1280×960 (imx708, 4.74 mm lens) |
+| `baseline` | about 87 mm, mostly in T's x component; y and z near 0 |
+| `per-pair error` | no pair far above the others. Delete outliers and re-run. |
+
+A good result needs 15–25 **varied** poses, including tilted ones. Straight-on views alone
+can't pin down the focal length.
+
+Restart `run_web.py` to load the new calibration, then open **/rectified**. With a good
+calibration, each feature sits on the same green line in both images. The calibration is
+only loaded if it was made with the current camera settings.
 
 ## Configuration — `config/default.yaml`
 
@@ -95,6 +122,7 @@ with `meta.json` recording the camera and board settings. To start over, delete 
 | `camera.sync` | `true` = libcamera software sync. The left camera is the server, the right the client. |
 | `camera.max_pair_dt_ms` | Drop left/right pairs further apart than this. Use `5` with sync, about `20` without. |
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
+| `web.preview_scale` | Size of the browser stream (0.5 = half). Capture and processing always use full resolution. |
 | `board.*` | ChArUco board: squares, measured square/marker size in mm, ArUco dictionary |
 
 The sensor mode, focus and output size must stay the same between calibration (Phase 3)
@@ -116,6 +144,7 @@ Unknown keys and invalid values are rejected at startup.
 config/default.yaml           runtime configuration
 scripts/run_web.py            start the web stream
 scripts/make_board.py         generate the printable ChArUco board PDF
+scripts/calibrate.py          compute the stereo calibration from captured pairs
 calibration/                  generated board PDF, later calibration results
 src/stereovision/
   config.py                   load and validate the YAML config
@@ -124,7 +153,10 @@ src/stereovision/
   camera/fake.py              fake source for tests / offline development
   camera/stereo_rig.py        one capture thread per camera, rotation, timestamp pairing
   calibration/board.py        ChArUco board from config, printable page, corner detection
-  calibration/capture.py      pair detection, overlay drawing, CaptureStore (saved pairs)
+  calibration/capture.py      pair detection, overlay, CaptureStore, AutoCapture
+  calibration/calibrate.py    intrinsics, stereo extrinsics, rectification, report
+  calibration/io.py           save/load calibration .npz, camera settings check
+  depth/rectify.py            Rectifier (remap tables), epipolar guide lines
   web/stream.py               MJPEG streaming helpers
   web/calibrate.py            /calibrate page: overlay stream, capture, delete last
   web/app.py                  Flask app: /, /video (MJPEG), /status, registers /calibrate

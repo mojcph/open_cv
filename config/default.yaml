@@ -1,7 +1,7 @@
 # Runtime configuration for the stereo rig.
 camera:
-  width: 640
-  height: 480
+  width: 1280
+  height: 960
   rotation: ccw90        # none | cw90 | ccw90 | 180 — applied before anything else
   left_index: 0          # Picamera2 camera number for the left image
   right_index: 1
@@ -22,6 +22,7 @@ web:
   host: 127.0.0.1
   port: 5000
   jpeg_quality: 80
+  preview_scale: 0.5     # browser stream size; capture/processing always use full resolution
 
 # ChArUco calibration board (phase 3). Generate it with: python scripts/make_board.py
 # After printing, MEASURE a square and enter the real sizes here - calibration accuracy

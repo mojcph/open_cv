@@ -1,6 +1,7 @@
 """Start the dual-camera web stream. Run on the Pi: python scripts/run_web.py [config.yaml]
 
-Pages: /  live view,  /calibrate  calibration capture,  /status  camera state (JSON).
+Pages: /  live view,  /calibrate  calibration capture,  /rectified  calibration check,
+       /status  camera state (JSON).
 """
 
 import argparse
@@ -8,12 +9,16 @@ from pathlib import Path
 
 from stereovision.calibration.board import make_board
 from stereovision.calibration.capture import CaptureStore, capture_meta
+from stereovision.calibration.io import camera_mismatch, load_calibration
 from stereovision.camera.picam import PicamSource
 from stereovision.camera.stereo_rig import StereoRig
 from stereovision.config import DEFAULT_CONFIG_PATH, CameraConfig, load_config
+from stereovision.depth.rectify import Rectifier
 from stereovision.web.app import create_app
 
-DEFAULT_CAPTURE_DIR = Path(__file__).resolve().parents[1] / "calibration" / "captures"
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CAPTURE_DIR = ROOT / "calibration" / "captures"
+DEFAULT_CALIBRATION = ROOT / "calibration" / "stereo.npz"
 
 
 def make_source(cam: CameraConfig, camera_num: int, sync_role: str) -> PicamSource:
@@ -28,11 +33,27 @@ def make_source(cam: CameraConfig, camera_num: int, sync_role: str) -> PicamSour
     )
 
 
+def load_rectifier(path: Path, camera_meta: dict) -> Rectifier | None:
+    """Rectifier from a calibration file, or None (with a message) if missing or stale."""
+    if not path.exists():
+        print(f"No calibration at {path} - /rectified disabled (run scripts/calibrate.py)")
+        return None
+    cal = load_calibration(path)
+    mismatch = camera_mismatch(cal, camera_meta)
+    if mismatch:
+        print(f"Ignoring {path}: {mismatch}")
+        return None
+    print(f"Loaded calibration {path} (baseline {cal.baseline_mm:.1f} mm)")
+    return Rectifier(cal)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("config", nargs="?", default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--captures", type=Path, default=DEFAULT_CAPTURE_DIR,
                         help="folder for calibration image pairs")
+    parser.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION,
+                        help="stereo calibration file (.npz) for /rectified")
     args = parser.parse_args()
     cfg = load_config(args.config)
 
@@ -44,10 +65,13 @@ def main() -> None:
         rotation=cam.rotation,
         max_pair_dt_ns=int(cam.max_pair_dt_ms * 1e6),
     )
-    store = CaptureStore(args.captures, capture_meta(cam, cfg.board))
+    meta = capture_meta(cam, cfg.board)
+    store = CaptureStore(args.captures, meta)
+    rectifier = load_rectifier(args.calibration, meta["camera"])
     rig.start()
     try:
-        app = create_app(rig, cfg.web.jpeg_quality, board=make_board(cfg.board), store=store)
+        app = create_app(rig, cfg.web.jpeg_quality, board=make_board(cfg.board), store=store,
+                         preview_scale=cfg.web.preview_scale, rectifier=rectifier)
         app.run(host=cfg.web.host, port=cfg.web.port, threaded=True, use_reloader=False)
     finally:
         rig.stop()

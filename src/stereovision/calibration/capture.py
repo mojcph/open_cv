@@ -76,19 +76,98 @@ def draw_view(image: np.ndarray, det: ViewDetection, good: bool) -> np.ndarray:
     """Copy of image with detected corners and a count label."""
     out = image.copy()
     if det.corners is not None:
-        cv2.aruco.drawDetectedCornersCharuco(out, det.corners, det.ids, GREEN)
+        # ids=None draws the corner markers only; id labels clutter the preview.
+        cv2.aruco.drawDetectedCornersCharuco(out, det.corners, None, GREEN)
     color = GREEN if good else RED
-    cv2.putText(out, f"{det.count} corners", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2,
-                cv2.LINE_AA)
+    scale = image.shape[1] / 600  # keep the label readable at any resolution
+    cv2.putText(out, f"{det.count} corners", (int(10 * scale), int(30 * scale)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8 * scale, color, max(2, int(2 * scale)), cv2.LINE_AA)
     return out
 
 
-def _diff_keys(a: dict, b: dict, prefix: str = "") -> list[str]:
+def mean_shift(a: ViewDetection, b: ViewDetection, min_shared: int = 4) -> float | None:
+    """Mean pixel distance between corners with the same id in two detections.
+
+    None if they share fewer than min_shared corners (too different to compare).
+    """
+    if a.ids is None or b.ids is None:
+        return None
+    pos_a = {int(i): p for i, p in zip(a.ids.ravel(), a.corners.reshape(-1, 2), strict=True)}
+    pos_b = {int(i): p for i, p in zip(b.ids.ravel(), b.corners.reshape(-1, 2), strict=True)}
+    shared = pos_a.keys() & pos_b.keys()
+    if len(shared) < min_shared:
+        return None
+    return float(np.mean([np.linalg.norm(pos_a[i] - pos_b[i]) for i in shared]))
+
+
+@dataclass(frozen=True)
+class AutoCaptureSettings:
+    """Thresholds as fractions of the image width, so they work at any resolution."""
+
+    still_frac: float = 0.003    # corners moved less than this per frame = "still"
+    still_frames: int = 4        # consecutive still frames before saving
+    novelty_frac: float = 0.06   # must differ this much from every saved pose
+    min_common: int = 8
+
+
+class AutoCapture:
+    """Decides, frame by frame, when to save a pair: board visible, held still, new pose.
+
+    Pure logic (no I/O): feed it detections with update(), tell it about saves with
+    saved()/forget_last(). Uses the left view for movement and novelty.
+    """
+
+    def __init__(self, settings: AutoCaptureSettings | None = None,
+                 saved_views: list[ViewDetection] | None = None) -> None:
+        self.settings = settings or AutoCaptureSettings()
+        self._saved = list(saved_views or [])
+        self._prev: ViewDetection | None = None
+        self._still = 0
+        self.message = "waiting for board"
+
+    def update(self, det: PairDetection, image_width: int) -> bool:
+        """True if this pair should be saved now. Sets self.message for the UI."""
+        s = self.settings
+        reason = check_pair(det, s.min_common)
+        prev, self._prev = self._prev, det.left
+        if reason is not None:
+            self._still = 0
+            self.message = reason
+            return False
+
+        shift = mean_shift(prev, det.left) if prev is not None else None
+        if shift is None or shift > s.still_frac * image_width:
+            self._still = 0
+            self.message = "moving - hold still"
+            return False
+        self._still += 1
+        if self._still < s.still_frames:
+            self.message = "hold still..."
+            return False
+
+        distances = [mean_shift(v, det.left) for v in self._saved]
+        nearest = min((d for d in distances if d is not None), default=None)
+        if nearest is not None and nearest < s.novelty_frac * image_width:
+            self.message = "pose already captured - move to a new position or angle"
+            return False
+        return True
+
+    def saved(self, view: ViewDetection) -> None:
+        self._saved.append(view)
+        self._still = 0
+        self.message = "saved - move to a new pose"
+
+    def forget_last(self) -> None:
+        if self._saved:
+            self._saved.pop()
+
+
+def diff_keys(a: dict, b: dict, prefix: str = "") -> list[str]:
     out = []
     for key in sorted(a.keys() | b.keys()):
         va, vb = a.get(key), b.get(key)
         if isinstance(va, dict) and isinstance(vb, dict):
-            out += _diff_keys(va, vb, f"{prefix}{key}.")
+            out += diff_keys(va, vb, f"{prefix}{key}.")
         elif va != vb:
             out.append(f"{prefix}{key}")
     return out
@@ -127,7 +206,7 @@ class CaptureStore:
             return None
         stored = json.loads(path.read_text(encoding="utf-8"))
         if stored != self.camera_meta:
-            diff = _diff_keys(stored, self.camera_meta)
+            diff = diff_keys(stored, self.camera_meta)
             return (f"existing captures used different camera settings ({', '.join(diff)}); "
                     f"clear {self.folder} first")
         return None

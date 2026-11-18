@@ -9,3 +9,4 @@ __pycache__/
 # Generated calibration files (regenerate with scripts/make_board.py)
 calibration/*.pdf
 calibration/captures*/
+calibration/*.npz

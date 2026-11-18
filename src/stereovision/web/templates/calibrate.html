@@ -14,15 +14,19 @@
 
       <div class="controls">
         <button id="capture" type="button">Capture pair (space)</button>
+        <button id="auto" type="button" class="secondary" aria-pressed="false">Auto capture: off</button>
         <button id="undo" type="button" class="secondary">Delete last</button>
         <span>Saved pairs: <strong id="count">{{ count }}</strong></span>
       </div>
+      <p id="auto-status" class="message"></p>
       <p id="message" class="message" role="status"></p>
 
       <details>
         <summary>Tips for a good calibration</summary>
         <ul>
           <li>Aim for 20–30 pairs. Green corner counts mean the pair can be saved.</li>
+          <li>Auto capture: move to a pose, hold still ~1 s, it saves; then move to a clearly
+            different pose. It skips poses too similar to one already saved.</li>
           <li>Cover the whole image: board in the centre, all four corners and the edges.</li>
           <li>Vary the distance (about 0.5–1.5 m) and tilt the board up to ~45° in different directions.</li>
           <li>Hold still while capturing; motion blur ruins the corners.</li>
@@ -67,9 +71,43 @@
         if (e.code === "Space" && !e.repeat) { e.preventDefault(); capture(); }
       });
 
-      fetch("{{ url_for('calibrate.state') }}").then(r => r.json()).then(s => {
-        if (s.mismatch) show(s.mismatch, false);
+      const autoBtn = document.getElementById("auto");
+      const autoStatus = document.getElementById("auto-status");
+      let autoOn = false;
+      let lastSeen = null;
+
+      function renderAuto() {
+        autoBtn.textContent = "Auto capture: " + (autoOn ? "on" : "off");
+        autoBtn.className = autoOn ? "" : "secondary";
+        autoBtn.setAttribute("aria-pressed", String(autoOn));
+        if (!autoOn) autoStatus.textContent = "";
+      }
+
+      autoBtn.addEventListener("click", async () => {
+        const r = await post(autoOn ? "{{ url_for('calibrate.set_auto', mode='off') }}"
+                                    : "{{ url_for('calibrate.set_auto', mode='on') }}");
+        autoOn = r.auto;
+        renderAuto();
       });
+
+      async function poll() {
+        try {
+          const s = await (await fetch("{{ url_for('calibrate.get_state') }}")).json();
+          count.textContent = s.count;
+          autoOn = s.auto;
+          renderAuto();
+          if (s.mismatch) show(s.mismatch, false);
+          if (autoOn && s.message) autoStatus.textContent = "Auto: " + s.message;
+          if (s.last && s.last.index !== lastSeen) {
+            if (lastSeen !== null || autoOn) {
+              show(`Saved pair ${s.last.index} — common ${s.last.common} corners`, true);
+            }
+            lastSeen = s.last.index;
+          }
+        } catch (e) { /* server restarting; try again */ }
+        setTimeout(poll, 500);
+      }
+      poll();
     </script>
   </body>
 </html>
