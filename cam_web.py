@@ -48,6 +48,7 @@ def capture_camera(name, camera_num):
 
         while True:
             frame = camera.capture_array()
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
             with lock:
                 frames[name] = frame
 
