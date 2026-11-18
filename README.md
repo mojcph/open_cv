@@ -49,6 +49,22 @@ rpicam-hello --list-cameras
 
 The server holds both cameras. Stop it (Ctrl+C) before running anything else that uses them.
 
+## Calibration board
+
+```bash
+.venv/bin/python scripts/make_board.py   # writes calibration/charuco_board.pdf
+```
+
+The board is a ChArUco board: 9×6 squares of 30 mm with 22 mm markers (DICT_5X5_100), on
+A4 landscape.
+
+1. Print at **100% / "Actual size"**, not "Fit to page".
+2. Check the 100 mm scale bar with a ruler.
+3. Measure a square (ideally across several squares, then divide). If it isn't exactly
+   30 mm, set `board.square_mm` and `board.marker_mm` (marker = square × 22/30) in the config.
+4. Glue the print onto something flat and stiff (foam board, glass, a clipboard). A curved
+   board ruins the calibration.
+
 ## Configuration — `config/default.yaml`
 
 | Key | Meaning |
@@ -63,6 +79,7 @@ The server holds both cameras. Stop it (Ctrl+C) before running anything else tha
 | `camera.sync` | `true` = libcamera software sync. The left camera is the server, the right the client. |
 | `camera.max_pair_dt_ms` | Drop left/right pairs further apart than this. Use `5` with sync, about `20` without. |
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
+| `board.*` | ChArUco board: squares, measured square/marker size in mm, ArUco dictionary |
 
 The sensor mode, focus and output size must stay the same between calibration (Phase 3)
 and measuring.
@@ -82,12 +99,15 @@ Unknown keys and invalid values are rejected at startup.
 ```
 config/default.yaml           runtime configuration
 scripts/run_web.py            start the web stream
+scripts/make_board.py         generate the printable ChArUco board PDF
+calibration/                  generated board PDF, later calibration results
 src/stereovision/
   config.py                   load and validate the YAML config
   camera/base.py              Frame + FrameSource interface
   camera/picam.py             Picamera2 source (the only module that imports picamera2)
   camera/fake.py              fake source for tests / offline development
-  camera/stereo_rig.py        one capture thread per camera, rotation, latest pair
+  camera/stereo_rig.py        one capture thread per camera, rotation, timestamp pairing
+  calibration/board.py        ChArUco board from config, printable page, corner detection
   web/app.py                  Flask app: /, /video (MJPEG), /status
   web/templates, web/static   HTML and CSS
 tests/                        pytest suite (hardware tests marked `hardware`)

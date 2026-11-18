@@ -60,9 +60,29 @@ class WebConfig:
 
 
 @dataclass(frozen=True)
+class BoardConfig:
+    """ChArUco calibration board. square_mm/marker_mm must be the MEASURED printed sizes."""
+
+    squares_x: int = 9
+    squares_y: int = 6
+    square_mm: float = 30.0
+    marker_mm: float = 22.0
+    dictionary: str = "DICT_5X5_100"
+
+    def __post_init__(self) -> None:
+        if self.squares_x < 3 or self.squares_y < 3:
+            raise ValueError("squares_x and squares_y must be at least 3")
+        if not 0 < self.marker_mm < self.square_mm:
+            raise ValueError("marker_mm must be positive and smaller than square_mm")
+        if not self.dictionary.startswith("DICT_"):
+            raise ValueError(f"dictionary must be an ArUco DICT_* name, got {self.dictionary!r}")
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig = field(default_factory=CameraConfig)
     web: WebConfig = field(default_factory=WebConfig)
+    board: BoardConfig = field(default_factory=BoardConfig)
 
 
 def _build(cls: type, data: dict[str, Any] | None):
@@ -77,10 +97,11 @@ def _build(cls: type, data: dict[str, Any] | None):
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     with open(path, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh) or {}
-    unknown = set(raw) - {"camera", "web"}
+    unknown = set(raw) - {"camera", "web", "board"}
     if unknown:
         raise ValueError(f"unknown config sections: {sorted(unknown)}")
     return Config(
         camera=_build(CameraConfig, raw.get("camera")),
         web=_build(WebConfig, raw.get("web")),
+        board=_build(BoardConfig, raw.get("board")),
     )
