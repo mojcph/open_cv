@@ -4,13 +4,14 @@ Two Raspberry Pi Camera Module 3 (imx708) cameras, mounted side by side about 87
 apart, used as a stereo pair. The goal is to measure the distance to objects, and later
 to detect the objects with YOLO-E.
 
-**Status: Phase 1 done.** Both cameras are rotated 90° anticlockwise and streamed side by side
-to a web page. The code is organised as a testable Python package.
+**Status: Phase 2 done.** Both cameras are rotated 90° anticlockwise and streamed side by side
+to a web page. They run with fixed focus and a fixed sensor mode, and libcamera software sync
+keeps their frames about 0.02 ms apart. The code is organised as a testable Python package.
 
 | Phase | What | Status |
 |-------|------|--------|
 | 1 | Restructure into a package, config file, pytest | ✅ done |
-| 2 | Lock focus and sensor mode, pair frames by timestamp | planned |
+| 2 | Lock focus and sensor mode, sync cameras, pair frames by timestamp | ✅ done |
 | 3 | Stereo calibration (checkerboard / ChArUco) | planned |
 | 4 | Depth map and distance measurement | planned |
 | 5 | YOLO-E object detection with distance labels | planned |
@@ -42,7 +43,9 @@ rpicam-hello --list-cameras
   open http://localhost:5000. This happens automatically if you start the server in the
   VS Code terminal.
 - http://127.0.0.1:5000/status shows the state of each camera, and `pair_dt_ms`, the time
-  between the left and right frames.
+  between the left and right frames. `in_sync` shows whether that gap is within
+  `max_pair_dt_ms`.
+- With sync on, the stream starts about 3–4 s after launch, while the cameras align.
 
 The server holds both cameras. Stop it (Ctrl+C) before running anything else that uses them.
 
@@ -54,7 +57,15 @@ The server holds both cameras. Stop it (Ctrl+C) before running anything else tha
 | `camera.rotation` | `none`, `cw90`, `ccw90` or `180`, applied to both images |
 | `camera.left_index`, `camera.right_index` | Picamera2 camera numbers |
 | `camera.swap_left_right` | `true` swaps the two cameras. Nearby objects should appear further **left** in the right image; if they don't, toggle this. |
+| `camera.sensor_size` | Fixed sensor mode. `[2304, 1296]` is the full field of view (1536×864 is a centre crop). |
+| `camera.frame_rate` | Fixed frame rate (both cameras) |
+| `camera.lens_position` | Manual focus in dioptres = 1 / distance in m (`1.0` = 1 m, `0` = infinity). `null` = autofocus, which breaks calibration. |
+| `camera.sync` | `true` = libcamera software sync. The left camera is the server, the right the client. |
+| `camera.max_pair_dt_ms` | Drop left/right pairs further apart than this. Use `5` with sync, about `20` without. |
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
+
+The sensor mode, focus and output size must stay the same between calibration (Phase 3)
+and measuring.
 
 Unknown keys and invalid values are rejected at startup.
 
@@ -80,7 +91,6 @@ src/stereovision/
   web/app.py                  Flask app: /, /video (MJPEG), /status
   web/templates, web/static   HTML and CSS
 tests/                        pytest suite (hardware tests marked `hardware`)
-cam_web.py                    original proof of concept (legacy)
 ```
 
 Keep all camera hardware access behind `FrameSource`, so everything else can be tested with

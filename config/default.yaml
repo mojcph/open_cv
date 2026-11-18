@@ -7,6 +7,17 @@ camera:
   right_index: 1
   swap_left_right: true  # true = swap the two cameras (camera 0 is physically on the right)
 
+  # Fixed capture settings. Calibration (phase 3) is only valid for these exact values.
+  sensor_size: [2304, 1296]  # imx708 full-field 2x2 binned mode (1536x864 is a centre crop)
+  frame_rate: 30
+  lens_position: 1.0     # manual focus in dioptres = 1 / distance in m (0 = infinity, 1 = 1 m)
+                         # null = continuous autofocus (breaks calibration!)
+
+  # Frame synchronisation
+  sync: true             # libcamera software sync: left camera = server, right = client
+  max_pair_dt_ms: 5      # drop left/right pairs further apart than this.
+                         # With sync: ~0.02 ms typical. Without sync use ~20 (half a frame).
+
 web:
   host: 127.0.0.1
   port: 5000

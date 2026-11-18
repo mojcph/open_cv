@@ -26,11 +26,12 @@ def wait_for(predicate, timeout=2.0):
 def running_rig():
     rigs = []
 
-    def _make(left=None, right=None, rotation="none"):
+    def _make(left=None, right=None, rotation="none", max_pair_dt_ns=None):
         rig = StereoRig(
             left or FakeSource([make_image(value=10)], fps=200),
             right or FakeSource([make_image(value=20)], fps=200),
             rotation=rotation,
+            max_pair_dt_ns=max_pair_dt_ns,
         )
         rig.start()
         rigs.append(rig)

@@ -20,14 +20,29 @@ class CameraConfig:
     left_index: int = 0
     right_index: int = 1
     swap_left_right: bool = False
+    sensor_size: tuple[int, int] = (2304, 1296)
+    frame_rate: float = 30.0
+    lens_position: float | None = 1.0
+    sync: bool = True
+    max_pair_dt_ms: float = 5.0
 
     def __post_init__(self) -> None:
         if self.rotation not in ROTATIONS:
             raise ValueError(f"rotation must be one of {ROTATIONS}, got {self.rotation!r}")
         if self.width <= 0 or self.height <= 0:
             raise ValueError("width and height must be positive")
-        if not isinstance(self.swap_left_right, bool):
-            raise ValueError("swap_left_right must be true or false")
+        for name in ("swap_left_right", "sync"):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"{name} must be true or false")
+        if len(self.sensor_size) != 2 or min(self.sensor_size) <= 0:
+            raise ValueError("sensor_size must be [width, height]")
+        object.__setattr__(self, "sensor_size", tuple(self.sensor_size))
+        if self.frame_rate <= 0:
+            raise ValueError("frame_rate must be positive")
+        if self.lens_position is not None and not 0.0 <= self.lens_position <= 32.0:
+            raise ValueError("lens_position must be between 0 and 32 dioptres, or null")
+        if self.max_pair_dt_ms <= 0:
+            raise ValueError("max_pair_dt_ms must be positive")
 
     @property
     def camera_indices(self) -> tuple[int, int]:

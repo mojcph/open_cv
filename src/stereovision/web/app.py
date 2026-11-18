@@ -46,9 +46,6 @@ def create_app(rig: StereoRig, jpeg_quality: int = 80) -> Flask:
 
     @app.route("/status")
     def camera_status():
-        status = rig.status()
-        pair = rig.latest()
-        status["pair_dt_ms"] = round(pair.dt_ns / 1e6, 2) if pair is not None else None
-        return jsonify(status)
+        return jsonify(rig.status() | rig.sync_info())
 
     return app
