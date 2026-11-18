@@ -1,1 +1,87 @@
-# open_cv
+# open_cv — Raspberry Pi 5 stereo camera
+
+Two Raspberry Pi Camera Module 3 (imx708) cameras, mounted side by side about 87 mm
+apart, used as a stereo pair. The goal is to measure the distance to objects, and later
+to detect the objects with YOLO-E.
+
+**Status: Phase 1 done.** Both cameras are rotated 90° anticlockwise and streamed side by side
+to a web page. The code is organised as a testable Python package.
+
+| Phase | What | Status |
+|-------|------|--------|
+| 1 | Restructure into a package, config file, pytest | ✅ done |
+| 2 | Lock focus and sensor mode, pair frames by timestamp | planned |
+| 3 | Stereo calibration (checkerboard / ChArUco) | planned |
+| 4 | Depth map and distance measurement | planned |
+| 5 | YOLO-E object detection with distance labels | planned |
+
+## Setup (on the Pi)
+
+```bash
+sudo apt install python3-picamera2          # camera library, from apt (not pip)
+python3 -m venv --system-site-packages .venv  # so the venv can see picamera2
+.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e .                    # makes the stereovision package importable
+```
+
+Check that both cameras are detected:
+
+```bash
+rpicam-hello --list-cameras
+```
+
+## Run the stream
+
+```bash
+.venv/bin/python scripts/run_web.py           # uses config/default.yaml
+.venv/bin/python scripts/run_web.py my.yaml   # or another config file
+```
+
+- Open http://127.0.0.1:5000 in a browser on the Pi.
+- From your PC, use VS Code Remote-SSH: forward port **5000** in the **Ports** tab, then
+  open http://localhost:5000. This happens automatically if you start the server in the
+  VS Code terminal.
+- http://127.0.0.1:5000/status shows the state of each camera, and `pair_dt_ms`, the time
+  between the left and right frames.
+
+The server holds both cameras. Stop it (Ctrl+C) before running anything else that uses them.
+
+## Configuration — `config/default.yaml`
+
+| Key | Meaning |
+|-----|---------|
+| `camera.width`, `camera.height` | Capture size, before rotation |
+| `camera.rotation` | `none`, `cw90`, `ccw90` or `180`, applied to both images |
+| `camera.left_index`, `camera.right_index` | Picamera2 camera numbers |
+| `camera.swap_left_right` | `true` swaps the two cameras. Nearby objects should appear further **left** in the right image; if they don't, toggle this. |
+| `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
+
+Unknown keys and invalid values are rejected at startup.
+
+## Tests
+
+```bash
+.venv/bin/pytest              # all tests that run without cameras
+.venv/bin/pytest -m hardware  # needs both cameras connected and not in use
+.venv/bin/ruff check src tests scripts
+```
+
+## Project layout
+
+```
+config/default.yaml           runtime configuration
+scripts/run_web.py            start the web stream
+src/stereovision/
+  config.py                   load and validate the YAML config
+  camera/base.py              Frame + FrameSource interface
+  camera/picam.py             Picamera2 source (the only module that imports picamera2)
+  camera/fake.py              fake source for tests / offline development
+  camera/stereo_rig.py        one capture thread per camera, rotation, latest pair
+  web/app.py                  Flask app: /, /video (MJPEG), /status
+  web/templates, web/static   HTML and CSS
+tests/                        pytest suite (hardware tests marked `hardware`)
+cam_web.py                    original proof of concept (legacy)
+```
+
+Keep all camera hardware access behind `FrameSource`, so everything else can be tested with
+`FakeSource`.
