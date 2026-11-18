@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calibration Capture</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <h1>Calibration capture</h1>
+      <img class="video-feed" src="{{ url_for('calibrate.video') }}"
+           alt="Live feed with detected board corners">
+
+      <div class="controls">
+        <button id="capture" type="button">Capture pair (space)</button>
+        <button id="undo" type="button" class="secondary">Delete last</button>
+        <span>Saved pairs: <strong id="count">{{ count }}</strong></span>
+      </div>
+      <p id="message" class="message" role="status"></p>
+
+      <details>
+        <summary>Tips for a good calibration</summary>
+        <ul>
+          <li>Aim for 20–30 pairs. Green corner counts mean the pair can be saved.</li>
+          <li>Cover the whole image: board in the centre, all four corners and the edges.</li>
+          <li>Vary the distance (about 0.5–1.5 m) and tilt the board up to ~45° in different directions.</li>
+          <li>Hold still while capturing; motion blur ruins the corners.</li>
+        </ul>
+        <p>Images are saved to <code>{{ folder }}</code>.</p>
+      </details>
+      <p><a href="{{ url_for('index') }}">Back to live view</a></p>
+    </main>
+    <script>
+      const msg = document.getElementById("message");
+      const count = document.getElementById("count");
+
+      function show(text, ok) {
+        msg.textContent = text;
+        msg.className = "message " + (ok ? "ok" : "error");
+      }
+
+      async function post(url) {
+        const resp = await fetch(url, { method: "POST" });
+        return resp.json();
+      }
+
+      async function capture() {
+        const r = await post("{{ url_for('calibrate.capture') }}");
+        count.textContent = r.count;
+        if (r.saved) {
+          show(`Saved pair ${r.index} — left ${r.left}, right ${r.right}, common ${r.common} corners`, true);
+        } else {
+          show(`Not saved: ${r.reason}`, false);
+        }
+      }
+
+      async function undo() {
+        const r = await post("{{ url_for('calibrate.undo') }}");
+        count.textContent = r.count;
+        show(r.removed === null ? "Nothing to delete" : `Deleted pair ${r.removed}`, r.removed !== null);
+      }
+
+      document.getElementById("capture").addEventListener("click", capture);
+      document.getElementById("undo").addEventListener("click", undo);
+      document.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && !e.repeat) { e.preventDefault(); capture(); }
+      });
+
+      fetch("{{ url_for('calibrate.state') }}").then(r => r.json()).then(s => {
+        if (s.mismatch) show(s.mismatch, false);
+      });
+    </script>
+  </body>
+</html>

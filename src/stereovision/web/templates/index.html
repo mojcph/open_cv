@@ -10,7 +10,10 @@
     <main class="page">
       <h1>Raspberry Pi 5 - Dual Camera</h1>
       <img class="video-feed" src="{{ url_for('video') }}" alt="Live feed from both cameras">
-      <p><a href="{{ url_for('camera_status') }}">Camera status</a></p>
+      <p>
+        <a href="{{ url_for('camera_status') }}">Camera status</a>
+        {% if calibration_enabled %} · <a href="{{ url_for('calibrate.page') }}">Calibration capture</a>{% endif %}
+      </p>
     </main>
   </body>
 </html>

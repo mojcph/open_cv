@@ -24,3 +24,37 @@ h1 {
 a {
   color: #0969da;
 }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: 0;
+  border-radius: 4px;
+  background: #0969da;
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #6e7781;
+}
+
+.message {
+  min-height: 1.5em;
+}
+
+.message.ok {
+  color: #1a7f37;
+}
+
+.message.error {
+  color: #cf222e;
+}

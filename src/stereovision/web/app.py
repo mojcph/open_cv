@@ -1,51 +1,40 @@
-"""Flask app factory: live side-by-side MJPEG stream and camera status."""
+"""Flask app factory: live side-by-side MJPEG stream, camera status, calibration capture."""
 
 from __future__ import annotations
 
-import time
-from collections.abc import Iterator
-
 import cv2
-from flask import Flask, Response, jsonify, render_template
+from flask import Flask, jsonify, render_template
 
-from stereovision.camera.stereo_rig import StereoFrame, StereoRig
-
-
-def encode_side_by_side(pair: StereoFrame, jpeg_quality: int = 80) -> bytes | None:
-    """Concatenate left|right and JPEG-encode. Returns None if encoding fails."""
-    combined = cv2.hconcat([pair.left.image, pair.right.image])
-    ok, jpeg = cv2.imencode(".jpg", combined, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality])
-    return jpeg.tobytes() if ok else None
+from stereovision.calibration.capture import CaptureStore
+from stereovision.camera.stereo_rig import StereoRig
+from stereovision.web.stream import mjpeg_response, side_by_side
 
 
-def mjpeg_stream(rig: StereoRig, jpeg_quality: int, max_fps: float = 30.0) -> Iterator[bytes]:
-    period = 1.0 / max_fps
-    while True:
-        pair = rig.latest()
-        jpeg = encode_side_by_side(pair, jpeg_quality) if pair is not None else None
-        if jpeg is None:
-            time.sleep(0.05)
-            continue
-        yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
-        time.sleep(period)
-
-
-def create_app(rig: StereoRig, jpeg_quality: int = 80) -> Flask:
+def create_app(
+    rig: StereoRig,
+    jpeg_quality: int = 80,
+    board: cv2.aruco.CharucoBoard | None = None,
+    store: CaptureStore | None = None,
+) -> Flask:
+    """board + store enable the /calibrate pages."""
     app = Flask(__name__)
+    calibration_enabled = board is not None and store is not None
 
     @app.route("/")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", calibration_enabled=calibration_enabled)
 
     @app.route("/video")
     def video():
-        return Response(
-            mjpeg_stream(rig, jpeg_quality),
-            mimetype="multipart/x-mixed-replace; boundary=frame",
-        )
+        return mjpeg_response(rig, side_by_side, jpeg_quality)
 
     @app.route("/status")
     def camera_status():
         return jsonify(rig.status() | rig.sync_info())
+
+    if calibration_enabled:
+        from stereovision.web.calibrate import create_blueprint
+
+        app.register_blueprint(create_blueprint(rig, board, store, jpeg_quality=jpeg_quality))
 
     return app

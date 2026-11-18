@@ -3,12 +3,13 @@ import numpy as np
 
 from conftest import make_image, wait_for
 from stereovision.camera import Frame, StereoFrame
-from stereovision.web.app import create_app, encode_side_by_side
+from stereovision.web.app import create_app
+from stereovision.web.stream import encode_jpeg, side_by_side
 
 
 def test_encode_side_by_side_doubles_width():
     pair = StereoFrame(Frame(make_image(64, 48), 0), Frame(make_image(64, 48), 5))
-    jpeg = encode_side_by_side(pair)
+    jpeg = encode_jpeg(side_by_side(pair))
     decoded = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
     assert decoded.shape == (48, 128, 3)
 

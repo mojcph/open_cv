@@ -65,6 +65,22 @@ A4 landscape.
 4. Glue the print onto something flat and stiff (foam board, glass, a clipboard). A curved
    board ruins the calibration.
 
+## Calibration capture
+
+1. Set the measured `board.square_mm` / `board.marker_mm` in the config **before** capturing.
+   The board settings are stored with the captures, and mixing captures taken with different
+   settings is refused.
+2. Start `scripts/run_web.py` and open **/calibrate** (link on the main page).
+3. Detected corners are drawn on both images. The count turns green when the pair is usable:
+   the board is seen by both cameras, with at least 8 common corners.
+4. Press **Capture pair** or the space bar. **Delete last** removes a bad pair.
+5. Collect 20–30 pairs: cover the centre, the corners and the edges of the image, vary the
+   distance (0.5–1.5 m) and the tilt (up to ~45°), and hold still.
+
+Pairs are saved as PNG to `calibration/captures/` (`000_left.png`, `000_right.png`, …),
+with `meta.json` recording the camera and board settings. To start over, delete that folder.
+`--captures <folder>` selects another folder, e.g. one per board.
+
 ## Configuration — `config/default.yaml`
 
 | Key | Meaning |
@@ -108,7 +124,10 @@ src/stereovision/
   camera/fake.py              fake source for tests / offline development
   camera/stereo_rig.py        one capture thread per camera, rotation, timestamp pairing
   calibration/board.py        ChArUco board from config, printable page, corner detection
-  web/app.py                  Flask app: /, /video (MJPEG), /status
+  calibration/capture.py      pair detection, overlay drawing, CaptureStore (saved pairs)
+  web/stream.py               MJPEG streaming helpers
+  web/calibrate.py            /calibrate page: overlay stream, capture, delete last
+  web/app.py                  Flask app: /, /video (MJPEG), /status, registers /calibrate
   web/templates, web/static   HTML and CSS
 tests/                        pytest suite (hardware tests marked `hardware`)
 ```

@@ -86,4 +86,5 @@ def detect_corners(board: cv2.aruco.CharucoBoard, gray: np.ndarray):
     corners, ids, _, _ = cv2.aruco.CharucoDetector(board).detectBoard(gray)
     if ids is None or len(ids) == 0:
         return None, None
-    return corners, ids
+    # OpenCV 5 returns (N, 2) / (N,); calibration and drawing functions expect (N, 1, 2) / (N, 1).
+    return corners.reshape(-1, 1, 2).astype(np.float32), ids.reshape(-1, 1).astype(np.int32)
