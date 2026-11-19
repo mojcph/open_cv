@@ -10,3 +10,6 @@ __pycache__/
 calibration/*.pdf
 calibration/captures*/
 calibration/*.npz
+
+# Downloaded / exported detection models
+models/

@@ -15,10 +15,16 @@ h1 {
   font-size: 1.5rem;
 }
 
+/* Scale the stream down to fit the window in both directions, keeping its aspect ratio.
+   Only the display shrinks; the image itself keeps its full resolution. */
 .video-feed {
   display: block;
-  width: 100%;
+  max-width: 100%;
+  max-height: calc(100vh - 10rem); /* leave room for the title and the controls */
+  width: auto;
   height: auto;
+  margin: 0 auto;
+  object-fit: contain;
 }
 
 a {
@@ -65,4 +71,20 @@ button.secondary {
 
 .readout {
   font-size: 1.25rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  min-width: 20rem;
+}
+
+th,
+td {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid #d0d7de;
+  text-align: left;
 }

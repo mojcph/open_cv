@@ -172,3 +172,11 @@ def test_depth_disabled_without_worker(running_rig):
 def test_invalid_depth_config(kw):
     with pytest.raises(ValueError):
         DepthConfig(**kw)
+
+
+def test_too_close_is_not_reported_as_a_distance():
+    """A shift beyond the search range must not come back as the max-range distance."""
+    cfg = DepthConfig(scale=1.0, num_disparities=32)
+    left, right = textured_pair(shift=48)  # closer than 32 px of search can reach
+    disp = compute_disparity(make_matcher(cfg), left, right, 1.0)
+    assert not (disp >= 31).any()

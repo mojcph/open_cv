@@ -119,11 +119,39 @@ class DepthConfig:
 
 
 @dataclass(frozen=True)
+class DetectionConfig:
+    """YOLO-E object detection with text-prompt classes (phase 5)."""
+
+    enabled: bool = True
+    model: str = "yoloe-26n-seg"   # yoloe-26n-seg (fast) | yoloe-26s-seg (better, ~2.5x slower)
+    classes: tuple[str, ...] = ("person", "cup", "bottle", "chair", "laptop", "keyboard",
+                                "computer mouse", "cell phone", "book")
+    imgsz: int = 640               # network input size; multiple of 32
+    confidence: float = 0.25
+    models_dir: str = "models"     # relative to the project root
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise ValueError("detection.enabled must be true or false")
+        classes = tuple(str(c).strip() for c in self.classes)
+        if not classes or any(not c for c in classes):
+            raise ValueError("detection.classes must be a non-empty list of names")
+        if len(set(classes)) != len(classes):
+            raise ValueError("detection.classes contains duplicates")
+        object.__setattr__(self, "classes", classes)
+        if self.imgsz < 32 or self.imgsz % 32:
+            raise ValueError("detection.imgsz must be a positive multiple of 32")
+        if not 0.0 < self.confidence < 1.0:
+            raise ValueError("detection.confidence must be between 0 and 1")
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig = field(default_factory=CameraConfig)
     web: WebConfig = field(default_factory=WebConfig)
     board: BoardConfig = field(default_factory=BoardConfig)
     depth: DepthConfig = field(default_factory=DepthConfig)
+    detection: DetectionConfig = field(default_factory=DetectionConfig)
 
 
 def _build(cls: type, data: dict[str, Any] | None):
@@ -138,7 +166,7 @@ def _build(cls: type, data: dict[str, Any] | None):
 def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     with open(path, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh) or {}
-    unknown = set(raw) - {"camera", "web", "board", "depth"}
+    unknown = set(raw) - {"camera", "web", "board", "depth", "detection"}
     if unknown:
         raise ValueError(f"unknown config sections: {sorted(unknown)}")
     return Config(
@@ -146,4 +174,5 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
         web=_build(WebConfig, raw.get("web")),
         board=_build(BoardConfig, raw.get("board")),
         depth=_build(DepthConfig, raw.get("depth")),
+        detection=_build(DetectionConfig, raw.get("detection")),
     )

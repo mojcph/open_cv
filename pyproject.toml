@@ -28,9 +28,10 @@ stereovision = ["web/templates/*", "web/static/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-m 'not hardware'"
+addopts = "-m 'not hardware and not model'"
 markers = [
     "hardware: needs the physical Pi cameras (run with: pytest -m hardware)",
+    "model: needs the exported YOLO-E detector (run with: pytest -m model)",
 ]
 
 [tool.ruff]

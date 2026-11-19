@@ -13,15 +13,10 @@ from flask import Blueprint, Response, jsonify, render_template, request
 from stereovision.config import DepthConfig
 from stereovision.depth.engine import DepthFrame, DepthWorker
 from stereovision.depth.measure import colorize_depth
+from stereovision.overlay import format_distance
 from stereovision.web.stream import downscale, encode_jpeg
 
 WHITE, BLACK = (255, 255, 255), (0, 0, 0)
-
-
-def format_distance(mm: float | None) -> str:
-    if mm is None:
-        return "no depth"
-    return f"{mm / 1000:.2f} m" if mm >= 1000 else f"{mm:.0f} mm"
 
 
 def draw_measurement(image: np.ndarray, x: int, y: int, mm: float | None, radius: int) -> None:

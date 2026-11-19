@@ -14,7 +14,7 @@ keeps their frames about 0.02 ms apart. The code is organised as a testable Pyth
 | 2 | Lock focus and sensor mode, sync cameras, pair frames by timestamp | ✅ done |
 | 3 | Stereo calibration (ChArUco): board, capture, calibrate, rectified check | ✅ code done — needs a real capture set |
 | 4 | Depth map and distance measurement | ✅ code done — tape-measure check after real calibration |
-| 5 | YOLO-E object detection with distance labels | planned |
+| 5 | YOLO-E object detection with distance labels | ✅ done — accuracy follows the calibration |
 
 ## Setup (on the Pi)
 
@@ -125,6 +125,29 @@ Needs a valid `calibration/stereo.npz`. Open **/depth**:
 Expected accuracy with the 87 mm baseline: about 1 cm at 1 m, about 5 cm at 3 m. The error
 grows with distance². Check it with a tape measure at 0.5, 1, 2 and 3 m.
 
+## Object detection
+
+YOLO-E (Ultralytics) with **text prompts**: the classes to look for are listed in the config.
+The model runs on the Pi CPU through an NCNN export.
+
+```bash
+.venv/bin/python scripts/export_detector.py   # after changing detection.model / classes / imgsz
+```
+
+The first run downloads the model and its text encoder into `models/` (git-ignored) and needs
+internet. The export bakes in the class list, and `run_web.py` refuses an export made for
+different settings. Open **/objects**: each detection shows a box and "label distance",
+plus a table sorted by distance.
+
+- Distance = median depth inside the middle 60% of the box, so the background around the
+  object's edges doesn't count. "no depth" means the object has no texture, or is closer
+  than the closest measurable distance.
+- Speed on a Pi 5 (`yoloe-26n-seg`, 640 px): depth ~140 ms + detection ~240 ms ≈ 2.5
+  measured frames/s. `yoloe-26s-seg` is more reliable but about 2.5× slower.
+- Use one page at a time: /depth and /objects together share the 4 CPU cores and both slow down.
+- Wrong labels usually mean the real object isn't in the class list. Add it (e.g. `ruler`,
+  `phone`) and re-export, or raise `detection.confidence`.
+
 ## Configuration — `config/default.yaml`
 
 | Key | Meaning |
@@ -141,6 +164,7 @@ grows with distance². Check it with a tape measure at 0.5, 1, 2 and 3 m.
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
 | `web.preview_scale` | Size of the browser stream (0.5 = half). Capture and processing always use full resolution. |
 | `board.*` | ChArUco board: squares, measured square/marker size in mm, ArUco dictionary |
+| `detection.*` | `enabled`, `model`, `classes` (text prompts), `imgsz`, `confidence`, `models_dir` |
 | `depth.*` | Stereo matching: working `scale`, `num_disparities` (search range), `block_size`, SGBM `mode`, heatmap range, measurement radius |
 
 The sensor mode, focus and output size must stay the same between calibration (Phase 3)
@@ -153,6 +177,7 @@ Unknown keys and invalid values are rejected at startup.
 ```bash
 .venv/bin/pytest              # all tests that run without cameras
 .venv/bin/pytest -m hardware  # needs both cameras connected and not in use
+.venv/bin/pytest -m model     # needs the exported YOLO-E detector
 .venv/bin/ruff check src tests scripts
 ```
 
@@ -163,6 +188,7 @@ config/default.yaml           runtime configuration
 scripts/run_web.py            start the web stream
 scripts/make_board.py         generate the printable ChArUco board PDF
 scripts/calibrate.py          compute the stereo calibration from captured pairs
+scripts/export_detector.py    export YOLO-E with the configured classes to NCNN
 calibration/                  generated board PDF, later calibration results
 src/stereovision/
   config.py                   load and validate the YAML config
@@ -179,6 +205,11 @@ src/stereovision/
   depth/measure.py            disparity -> depth, point/box distance, heatmap
   depth/engine.py             DepthEngine (per frame), DepthWorker (background thread)
   web/depth.py                /depth page: crosshair distance, heatmap, click to measure
+  detection/base.py           Detection + Detector interface (no ML library needed)
+  detection/yoloe.py          YOLO-E export/load (the only module importing ultralytics)
+  detection/worker.py         DetectionWorker: frame -> depth -> detections -> distances
+  overlay.py                  boxes with 'label distance' tags
+  web/objects.py              /objects page and /objects/list JSON
   web/stream.py               MJPEG streaming helpers
   web/calibrate.py            /calibrate page: overlay stream, capture, delete last
   web/app.py                  Flask app: /, /video (MJPEG), /status, registers /calibrate

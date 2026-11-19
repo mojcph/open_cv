@@ -49,3 +49,13 @@ depth:
   display_min_mm: 300    # heatmap colour range
   display_max_mm: 3000
   measure_radius_px: 8   # median over this radius around the clicked point
+
+# Object detection (phase 5): YOLO-E with text prompts, run on the rectified left image.
+# After changing model, classes or imgsz, re-run:  python scripts/export_detector.py
+detection:
+  enabled: true
+  model: yoloe-26n-seg   # yoloe-26n-seg (~9/s on Pi 5) | yoloe-26s-seg (more reliable, ~4/s)
+  classes: [person, cup, bottle, chair, laptop, keyboard, computer mouse, cell phone, book]
+  imgsz: 640
+  confidence: 0.25       # minimum detection score
+  models_dir: models

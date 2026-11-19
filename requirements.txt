@@ -18,6 +18,14 @@ PyYAML==6.0.2
 typing_extensions==4.16.0
 Werkzeug==3.1.9
 
+# Object detection (phase 5): YOLO-E via Ultralytics.
+# CPU-only PyTorch: the "+cpu" pins plus this index stop pip from pulling the multi-GB
+# NVIDIA CUDA packages, which a Raspberry Pi cannot use.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.15.0+cpu
+torchvision==0.29.2+cpu
+ultralytics==8.4.215
+
 # Development / testing
 pytest==9.2.0
 ruff==0.17.5

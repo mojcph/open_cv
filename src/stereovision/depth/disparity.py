@@ -49,5 +49,8 @@ def compute_disparity(
         right = cv2.resize(right, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     raw = matcher.compute(left, right)  # int16, 4 fractional bits; invalid = minDisparity - 1
     disparity = raw.astype(np.float32) / 16.0
-    disparity[raw <= 0] = np.nan
+    # Values at the top of the search range are objects CLOSER than the matcher can measure
+    # (the search saturates there), not real distances: drop them too.
+    saturated = raw >= (matcher.getNumDisparities() - 1) * 16
+    disparity[(raw <= 0) | saturated] = np.nan
     return disparity / scale

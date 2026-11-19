@@ -10,6 +10,7 @@ from stereovision.camera.stereo_rig import StereoFrame, StereoRig
 from stereovision.config import DepthConfig
 from stereovision.depth.engine import DepthWorker
 from stereovision.depth.rectify import Rectifier, draw_epipolar_lines
+from stereovision.detection.worker import DetectionWorker
 from stereovision.web.stream import mjpeg_response, side_by_side
 
 
@@ -22,6 +23,8 @@ def create_app(
     rectifier: Rectifier | None = None,
     depth_worker: DepthWorker | None = None,
     depth_cfg: DepthConfig | None = None,
+    detection_worker: DetectionWorker | None = None,
+    model_name: str = "",
 ) -> Flask:
     """board + store enable /calibrate; rectifier enables /rectified; depth_worker /depth."""
     app = Flask(__name__)
@@ -31,7 +34,8 @@ def create_app(
     def index():
         return render_template("index.html", calibration_enabled=calibration_enabled,
                                rectified_enabled=rectifier is not None,
-                               depth_enabled=depth_worker is not None)
+                               depth_enabled=depth_worker is not None,
+                               objects_enabled=detection_worker is not None)
 
     if rectifier is not None:
         def render_rectified(pair: StereoFrame):
@@ -69,6 +73,13 @@ def create_app(
 
         app.register_blueprint(depth_blueprint(
             depth_worker, depth_cfg or DepthConfig(), jpeg_quality, preview_scale
+        ))
+
+    if detection_worker is not None:
+        from stereovision.web.objects import create_blueprint as objects_blueprint
+
+        app.register_blueprint(objects_blueprint(
+            detection_worker, model_name, jpeg_quality, preview_scale
         ))
 
     return app
