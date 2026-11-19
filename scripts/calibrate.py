@@ -41,6 +41,9 @@ def main() -> int:
     parser.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--baseline", type=float, default=EXPECTED_BASELINE_MM,
                         help="expected camera spacing in mm, for the sanity check")
+    parser.add_argument("--square-mm", type=float,
+                        help="corrected measured square size: overrides the captures' meta.json "
+                             "(marker size scales along); no need to recapture")
     args = parser.parse_args()
 
     meta_path = args.captures / CaptureStore.META
@@ -48,9 +51,16 @@ def main() -> int:
         print(f"No {CaptureStore.META} in {args.captures} - is this a captures folder?")
         return 1
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    pairs = CaptureStore(args.captures, meta).load_pairs()
+    if args.square_mm:
+        # Only the scale changes: corners are detected the same way, so the captures stay
+        # valid. The result records the corrected size.
+        old = meta["board"]["square_mm"]
+        meta["board"]["marker_mm"] = round(meta["board"]["marker_mm"] * args.square_mm / old, 3)
+        meta["board"]["square_mm"] = args.square_mm
+        print(f"Using square {args.square_mm} mm (captured with {old} mm in meta.json)")
     board = make_board(BoardConfig(**meta["board"]))
 
-    pairs = CaptureStore(args.captures, meta).load_pairs()
     print(f"{len(pairs)} pairs in {args.captures}")
     detections = [detect_pair(board, left, right) for left, right in pairs]
     for i, d in enumerate(detections):

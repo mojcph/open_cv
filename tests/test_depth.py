@@ -180,3 +180,38 @@ def test_too_close_is_not_reported_as_a_distance():
     left, right = textured_pair(shift=48)  # closer than 32 px of search can reach
     disp = compute_disparity(make_matcher(cfg), left, right, 1.0)
     assert not (disp >= 31).any()
+
+
+# --- distance from the midpoint between the cameras ------------------------------------------
+
+def test_range_from_midpoint_known_geometry():
+    from stereovision.depth.measure import range_from_midpoint
+
+    f, cx, cy, b = 1000.0, 480.0, 640.0, 88.0
+    z = 400.0
+    # Straight in front of the midpoint (X = B/2, Y = 0): distance is exactly the depth.
+    x_mid = cx + f * (b / 2) / z
+    assert range_from_midpoint(x_mid, cy, z, f, cx, cy, b) == pytest.approx(z)
+    # 3-4-5 triangle: 300 mm sideways of the midpoint, 400 mm deep -> 500 mm.
+    x = cx + f * (b / 2 + 300) / z
+    assert range_from_midpoint(x, cy, z, f, cx, cy, b) == pytest.approx(500.0)
+    # Same for a vertical offset.
+    y = cy + f * 300 / z
+    assert range_from_midpoint(x_mid, y, z, f, cx, cy, b) == pytest.approx(500.0)
+
+
+def test_engine_distance_vs_depth_off_axis():
+    import math
+
+    left, right = textured_pair()
+    frame = make_engine().compute(StereoFrame(Frame(left, 1), Frame(right, 1)))
+    o = frame.optics
+    # x >= 160: the left ~128 px are seen by the left camera only (no depth there)
+    for x, y in ((320, 240), (200, 60), (600, 440)):
+        z = frame.depth_at(x, y, 8)
+        expected = math.sqrt(((x - o.cx) * z / o.focal_px - o.baseline_mm / 2) ** 2
+                             + ((y - o.cy) * z / o.focal_px) ** 2 + z**2)
+        assert frame.distance_at(x, y, 8) == pytest.approx(expected)
+        assert frame.distance_at(x, y, 8) >= z     # never shorter than the depth
+    # In a corner, far off-axis, the straight-line distance is clearly larger than the depth.
+    assert frame.distance_at(620, 460, 8) > 1.05 * frame.depth_at(620, 460, 8)

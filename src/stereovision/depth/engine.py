@@ -11,21 +11,49 @@ import numpy as np
 from stereovision.camera.stereo_rig import StereoFrame, StereoRig
 from stereovision.config import DepthConfig
 from stereovision.depth.disparity import compute_disparity, make_matcher
-from stereovision.depth.measure import disparity_to_depth, region_distance
+from stereovision.depth.measure import (
+    disparity_to_depth,
+    range_from_midpoint,
+    region_distance,
+)
 from stereovision.depth.rectify import Rectifier
+
+
+@dataclass(frozen=True)
+class Optics:
+    """Rectified-left camera geometry, full-resolution pixels."""
+
+    focal_px: float
+    cx: float
+    cy: float
+    baseline_mm: float
 
 
 @dataclass(frozen=True)
 class DepthFrame:
     left: np.ndarray      # rectified left image, full resolution (BGR)
-    depth: np.ndarray     # depth in mm at the working scale, NaN = no measurement
+    depth: np.ndarray     # depth Z in mm (along the camera axis) at the working scale, NaN = none
     scale: float          # depth-array pixels per full-resolution pixel
     timestamp_ns: int
+    optics: Optics | None = None  # None: distance_at falls back to plain depth Z
 
-    def distance_at(self, x: float, y: float, radius_px: int) -> float | None:
-        """Distance (mm) at full-resolution pixel (x, y), median over radius_px."""
+    def depth_at(self, x: float, y: float, radius_px: int) -> float | None:
+        """Depth Z (mm) at full-resolution pixel (x, y): median over radius_px."""
         s = self.scale
         return region_distance(self.depth, x * s, y * s, max(1, round(radius_px * s)))
+
+    def range_at(self, x: float, y: float, z: float) -> float:
+        """Straight-line distance from the midpoint between the cameras, for depth z at
+        full-resolution pixel (x, y)."""
+        if self.optics is None:
+            return z
+        o = self.optics
+        return range_from_midpoint(x, y, z, o.focal_px, o.cx, o.cy, o.baseline_mm)
+
+    def distance_at(self, x: float, y: float, radius_px: int) -> float | None:
+        """Distance (mm) from the midpoint between the cameras to what is seen at (x, y)."""
+        z = self.depth_at(x, y, radius_px)
+        return None if z is None else self.range_at(x, y, z)
 
 
 class DepthEngine:
@@ -33,11 +61,12 @@ class DepthEngine:
     rectified (used in tests)."""
 
     def __init__(self, rectifier: Rectifier | None, focal_px: float, baseline_mm: float,
-                 cfg: DepthConfig) -> None:
+                 cfg: DepthConfig, cx: float | None = None, cy: float | None = None) -> None:
         self.rectifier = rectifier
         self.focal_px = focal_px
         self.baseline_mm = baseline_mm
         self.cfg = cfg
+        self.cx, self.cy = cx, cy  # principal point; None = image centre
         self._matcher = make_matcher(cfg)
 
     @classmethod
@@ -45,7 +74,8 @@ class DepthEngine:
         cal = rectifier.calibration
         # Rectified baseline from P2 = [f 0 cx f*Tx]; Tx is negative for a right camera.
         baseline = -float(cal.P2[0, 3]) / float(cal.P2[0, 0])
-        return cls(rectifier, cal.focal_px, baseline, cfg)
+        return cls(rectifier, cal.focal_px, baseline, cfg,
+                   cx=float(cal.P1[0, 2]), cy=float(cal.P1[1, 2]))
 
     @property
     def min_distance_mm(self) -> float:
@@ -58,7 +88,12 @@ class DepthEngine:
             left, right = self.rectifier.rectify(left, right)
         disparity = compute_disparity(self._matcher, left, right, self.cfg.scale)
         depth = disparity_to_depth(disparity, self.focal_px, self.baseline_mm)
-        return DepthFrame(left, depth, self.cfg.scale, pair.left.timestamp_ns)
+        h, w = left.shape[:2]
+        optics = Optics(self.focal_px,
+                        (w - 1) / 2 if self.cx is None else self.cx,
+                        (h - 1) / 2 if self.cy is None else self.cy,
+                        self.baseline_mm)
+        return DepthFrame(left, depth, self.cfg.scale, pair.left.timestamp_ns, optics)
 
 
 class DepthWorker:

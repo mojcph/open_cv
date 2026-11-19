@@ -9,7 +9,9 @@
 {% block panel %}
   <h2>Distance</h2>
   <p class="readout big"><strong id="distance">–</strong></p>
+  <p class="small">Straight line from the midpoint between the cameras.</p>
   <dl class="stats">
+    <dt>Depth (Z)</dt><dd id="depthz">–</dd>
     <dt>Depth rate</dt><dd><span id="fps">–</span> fps</dd>
     <dt>Valid pixels</dt><dd id="valid">–</dd>
   </dl>
@@ -18,6 +20,7 @@
   </div>
   <p id="message" class="message error" role="status"></p>
   <p class="small">Click either picture to measure there (median over a small circle).
+    Depth (Z) is measured straight ahead along the camera axis; the heatmap shows Z.
     Heatmap: red = near ({{ (min_mm / 1000) | round(2) }} m), blue = far
     ({{ (max_mm / 1000) | round(1) }} m), black = no depth (no texture, or only one camera
     sees it). Closest measurable: about {{ (closest_mm / 1000) | round(2) }} m.</p>
@@ -50,6 +53,8 @@
     try {
       const m = await (await fetch("{{ url_for('depth.get_measure') }}")).json();
       document.getElementById("distance").textContent = fmt(m.distance_mm);
+      document.getElementById("depthz").textContent =
+        m.depth_mm === undefined ? "–" : fmt(m.depth_mm);
       document.getElementById("fps").textContent = m.fps;
       document.getElementById("valid").textContent =
         m.valid_fraction === undefined ? "–" : Math.round(m.valid_fraction * 100) + "%";

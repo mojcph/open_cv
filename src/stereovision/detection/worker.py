@@ -15,7 +15,8 @@ from stereovision.detection.base import Detection, Detector
 @dataclass(frozen=True)
 class MeasuredObject:
     detection: Detection
-    distance_mm: float | None  # median depth inside the (shrunk) box; None = no depth there
+    distance_mm: float | None  # straight line from the camera midpoint; None = no depth
+    depth_mm: float | None = None  # median depth Z (along the camera axis) inside the shrunk box
 
 
 @dataclass(frozen=True)
@@ -27,12 +28,16 @@ class ObjectFrame:
 
 
 def measure_objects(frame: DepthFrame, detections: list[Detection]) -> list[MeasuredObject]:
-    """Distance for each box. Boxes are in full-resolution pixels; depth is at frame.scale."""
+    """Distance for each box: median depth inside the box, then the straight-line distance
+    from the camera midpoint to the box centre. Boxes are in full-resolution pixels."""
     s = frame.scale
-    return [
-        MeasuredObject(d, box_distance(frame.depth, tuple(v * s for v in d.box)))
-        for d in detections
-    ]
+    out = []
+    for d in detections:
+        z = box_distance(frame.depth, tuple(v * s for v in d.box))
+        x0, y0, x1, y1 = d.box
+        distance = None if z is None else frame.range_at((x0 + x1) / 2, (y0 + y1) / 2, z)
+        out.append(MeasuredObject(d, distance, z))
+    return out
 
 
 class DetectionWorker:

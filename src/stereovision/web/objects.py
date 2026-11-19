@@ -39,6 +39,7 @@ def create_blueprint(worker: DetectionWorker, model_name: str, jpeg_quality: int
                 "confidence": round(o.detection.confidence, 3),
                 "box": [round(v, 1) for v in o.detection.box],
                 "distance_mm": None if o.distance_mm is None else round(o.distance_mm, 1),
+                "depth_mm": None if o.depth_mm is None else round(o.depth_mm, 1),
             } for o in sorted(result.objects, key=lambda o: o.distance_mm or float("inf"))],
         )
 

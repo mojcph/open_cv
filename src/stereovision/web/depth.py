@@ -33,6 +33,10 @@ def draw_measurement(image: np.ndarray, x: int, y: int, mm: float | None, radius
                     cv2.LINE_AA)
 
 
+def _round(v: float | None) -> float | None:
+    return None if v is None else round(v, 1)
+
+
 def create_blueprint(
     worker: DepthWorker,
     cfg: DepthConfig,
@@ -93,6 +97,7 @@ def create_blueprint(
         x, y, mm = measure(frame)
         return jsonify(
             distance_mm=None if mm is None else round(mm, 1), x=x, y=y,
+            depth_mm=_round(frame.depth_at(x, y, cfg.measure_radius_px)),
             fps=round(worker.fps, 1), error=worker.error,
             valid_fraction=round(float(np.isfinite(frame.depth).mean()), 3),
         )

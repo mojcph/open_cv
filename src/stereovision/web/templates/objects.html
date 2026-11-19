@@ -19,8 +19,9 @@
     </table>
   </div>
   <p class="small">Looking for: {{ classes }}. Change <code>detection.classes</code> in the
-    config, then re-run <code>scripts/export_detector.py</code>. Distance = median depth in the
-    middle of each box; "no depth" = too little texture, or too close.</p>
+    config, then re-run <code>scripts/export_detector.py</code>. Distance = straight line from the
+    midpoint between the cameras to the box centre, using the median depth in the middle of
+    the box; "no depth" = too little texture, or too close.</p>
 {% endblock %}
 {% block scripts %}
 <script>

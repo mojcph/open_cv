@@ -167,3 +167,16 @@ def test_yoloe_keeps_opencv_multithreading():
 
     _import_ultralytics()
     assert cv2.getNumThreads() > 1
+
+
+def test_measure_objects_distance_from_midpoint():
+    from stereovision.depth.engine import Optics
+
+    frame = depth_frame()
+    frame = DepthFrame(frame.left, frame.depth, frame.scale, 1,
+                       Optics(focal_px=500.0, cx=320.0, cy=240.0, baseline_mm=88.0))
+    centred = Detection("cup", 0.9, (160, 120, 480, 360))   # object, box centred on the axis
+    obj = measure_objects(frame, [centred])[0]
+    assert obj.depth_mm == pytest.approx(1000.0)
+    # box centre (320, 240) is on the left camera's axis: 44 mm left of the midpoint
+    assert obj.distance_mm == pytest.approx((1000.0**2 + 44.0**2) ** 0.5)

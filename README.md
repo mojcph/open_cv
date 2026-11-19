@@ -118,8 +118,12 @@ only loaded if it was made with the current camera settings.
 
 Needs a valid `calibration/stereo.npz`. Open **/depth**:
 
-- Left: the rectified left image with a crosshair and the distance at that point (median over
-  a small circle). Right: the depth heatmap (red = near, blue = far, black = no depth).
+- **Distance** = straight line from the **midpoint between the two cameras** to the point,
+  like a tape measure from the centre of the rig. It's computed from the depth Z (median over
+  a small circle) and the pixel position. **Depth (Z)** is the distance straight ahead along
+  the camera axis, which the heatmap shows. Off to the side the distance is larger than Z:
+  about 13% larger at the edge of the view.
+- Left: the rectified left image with a crosshair and the distance at that point. Right: the depth heatmap (red = near, blue = far, black = no depth).
 - Click either image to move the crosshair. **Centre** resets it.
 - Depth is computed at `depth.scale` (default half resolution, about 6 frames/s on a Pi 5) in
   one background thread. It pauses when no depth page is open.
@@ -145,8 +149,9 @@ internet. The export bakes in the class list, and `run_web.py` refuses an export
 different settings. Open **/objects**: each detection shows a box and "label distance",
 plus a table sorted by distance.
 
-- Distance = median depth inside the middle 60% of the box, so the background around the
-  object's edges doesn't count. "no depth" means the object has no texture, or is closer
+- Distance = straight line from the midpoint between the cameras to the box centre. It uses
+  the median depth inside the middle 60% of the box, so the background around the object's
+  edges doesn't count. "no depth" means the object has no texture, or is closer
   than the closest measurable distance.
 - Speed on a Pi 5 (`yoloe-26n-seg`, 640 px): depth ~140 ms + detection ~240 ms ≈ 2.5
   measured frames/s. `yoloe-26s-seg` is more reliable but about 2.5× slower.

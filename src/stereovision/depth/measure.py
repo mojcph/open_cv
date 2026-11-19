@@ -14,6 +14,19 @@ def disparity_to_depth(disparity: np.ndarray, focal_px: float, baseline_mm: floa
     return depth.astype(np.float32)
 
 
+def range_from_midpoint(x: float, y: float, z: float, focal_px: float, cx: float, cy: float,
+                        baseline_mm: float) -> float:
+    """Straight-line distance (mm) from the midpoint between the two cameras to the point
+    seen at rectified-left pixel (x, y) with depth z.
+
+    In rectified left-camera coordinates the point is X = (x - cx) z / f, Y = (y - cy) z / f,
+    Z = z; the right camera sits at (B, 0, 0), so the midpoint is (B/2, 0, 0).
+    """
+    X = (x - cx) * z / focal_px
+    Y = (y - cy) * z / focal_px
+    return float(np.sqrt((X - baseline_mm / 2) ** 2 + Y**2 + z**2))
+
+
 def _median(values: np.ndarray, min_valid: float) -> float | None:
     finite = values[np.isfinite(values)]
     if finite.size == 0 or finite.size < min_valid * values.size:
