@@ -58,10 +58,13 @@ class WebConfig:
     port: int = 5000
     jpeg_quality: int = 80
     preview_scale: float = 0.5  # shrink the browser stream only (saves SSH/Wi-Fi bandwidth)
+    max_fps: float = 10.0       # upper limit per picture stream (saves SSH/Wi-Fi bandwidth)
 
     def __post_init__(self) -> None:
         if not 0.1 <= self.preview_scale <= 1.0:
             raise ValueError("preview_scale must be between 0.1 and 1.0")
+        if not 1.0 <= self.max_fps <= 30.0:
+            raise ValueError("max_fps must be between 1 and 30")
         if not 1 <= self.jpeg_quality <= 100:
             raise ValueError("jpeg_quality must be between 1 and 100")
 

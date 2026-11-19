@@ -15,7 +15,7 @@ from typing import Generic, TypeVar
 
 import cv2
 import numpy as np
-from flask import Response, abort
+from flask import Response, abort, current_app
 
 T = TypeVar("T")
 
@@ -82,5 +82,8 @@ def picture_response(renderer: SharedRenderer, index: int, count: int, jpeg_qual
                      scale: float = 1.0, max_fps: float = 30.0) -> Response:
     if not 0 <= index < count:
         abort(404)
+    cap = current_app.config.get("STREAM_MAX_FPS")  # app-wide limit from web.max_fps
+    if cap:
+        max_fps = min(max_fps, cap)
     return Response(picture_stream(renderer, index, jpeg_quality, scale, max_fps),
                     mimetype="multipart/x-mixed-replace; boundary=frame")

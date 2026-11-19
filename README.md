@@ -169,6 +169,7 @@ plus a table sorted by distance.
 | `camera.max_pair_dt_ms` | Drop left/right pairs further apart than this. Use `5` with sync, about `20` without. |
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
 | `web.preview_scale` | Size of the browser stream (0.5 = half). Capture and processing always use full resolution. |
+| `web.max_fps` | Frame-rate limit per picture in the browser (default 10). At 30 fps, one live picture is about 8 Mbit/s through the SSH tunnel, enough to make VS Code's connection drop. |
 | `board.*` | ChArUco board: squares, measured square/marker size in mm, ArUco dictionary |
 | `detection.*` | `enabled`, `model`, `classes` (text prompts), `imgsz`, `confidence`, `models_dir` |
 | `depth.*` | Stereo matching: working `scale`, `num_disparities` (search range), `block_size`, SGBM `mode`, heatmap range, measurement radius |

@@ -81,3 +81,28 @@ def test_each_camera_has_its_own_stream(running_rig):
         assert img.shape == (48, 64, 3)                 # one camera, not side by side
         assert abs(int(img[20, 30, 0]) - value) < 8
     assert client.get("/video/2").status_code == 404
+
+
+def test_max_fps_limits_stream_rate(running_rig):
+    import time
+
+    rig = running_rig()   # fake cameras run at 200 fps
+    assert wait_for(lambda: rig.latest() is not None)
+    resp = create_app(rig, max_fps=5).test_client().get("/video/0")
+    frames = resp.response
+    next(frames)
+    start = time.monotonic()
+    for _ in range(3):
+        next(frames)
+    resp.close()
+    assert time.monotonic() - start >= 0.55   # 3 frames at <= 5 fps take >= 0.6 s
+
+
+def test_invalid_max_fps():
+    import pytest
+
+    from stereovision.config import WebConfig
+
+    for bad in (0, 60):
+        with pytest.raises(ValueError, match="max_fps"):
+            WebConfig(max_fps=bad)

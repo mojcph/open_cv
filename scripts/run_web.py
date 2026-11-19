@@ -103,7 +103,8 @@ def main() -> None:
             worker.start()
     try:
         app = create_app(rig, cfg.web.jpeg_quality, board=make_board(cfg.board), store=store,
-                         preview_scale=cfg.web.preview_scale, rectifier=rectifier,
+                         preview_scale=cfg.web.preview_scale, max_fps=cfg.web.max_fps,
+                         rectifier=rectifier,
                          depth_worker=depth_worker, depth_cfg=cfg.depth,
                          detection_worker=detection_worker, model_name=cfg.detection.model)
         app.run(host=cfg.web.host, port=cfg.web.port, threaded=True, use_reloader=False)

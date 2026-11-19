@@ -23,6 +23,8 @@ web:
   port: 5000
   jpeg_quality: 80
   preview_scale: 0.5     # browser stream size; capture/processing always use full resolution
+  max_fps: 10            # frame-rate limit per picture in the browser. Each live picture at
+                         # 30 fps is ~8 Mbit/s through the SSH tunnel; 10 fps is ~2.7 Mbit/s.
 
 # ChArUco calibration board (phase 3). Generate it with: python scripts/make_board.py
 # After printing, MEASURE a square and enter the real sizes here - calibration accuracy

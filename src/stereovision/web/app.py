@@ -30,10 +30,12 @@ def create_app(
     depth_cfg: DepthConfig | None = None,
     detection_worker: DetectionWorker | None = None,
     model_name: str = "",
+    max_fps: float | None = None,
 ) -> Flask:
     """board + store enable /calibrate; rectifier /rectified; depth_worker /depth;
     detection_worker /objects. Pages that aren't enabled don't exist (404)."""
     app = Flask(__name__)
+    app.config["STREAM_MAX_FPS"] = max_fps  # caps every picture stream (None = no cap)
     pages: list[tuple[str, str]] = [("Live view", "index")]  # (label, endpoint) for the nav
 
     @app.context_processor
