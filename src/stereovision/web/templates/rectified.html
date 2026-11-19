@@ -1,20 +1,15 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Rectified View</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <main class="page">
-      <h1>Rectified view</h1>
-      <img class="video-feed" src="{{ url_for('rectified_video') }}"
-           alt="Rectified left and right images with horizontal guide lines">
-      <p>With a good calibration, every feature sits on the <strong>same green line</strong> in
-        both images, and straight edges look straight. If features drift above or below
-        each other, or the image looks warped, recalibrate.</p>
-      <p><a href="{{ url_for('index') }}">Back to live view</a></p>
-    </main>
-  </body>
-</html>
+{% extends "base.html" %}
+{% set pictures = [
+  {"src": url_for("rectified_video", index=0), "alt": "Rectified left image with guide lines",
+   "caption": "Rectified left"},
+  {"src": url_for("rectified_video", index=1), "alt": "Rectified right image with guide lines",
+   "caption": "Rectified right"},
+] %}
+{% block title %}Rectified{% endblock %}
+{% block panel %}
+  <h2>Calibration check</h2>
+  <p>With a good calibration, every feature sits on the <strong>same green line</strong> in
+    both images, and straight edges look straight.</p>
+  <p>If features drift above or below each other, or the images look warped or strongly
+    zoomed, recalibrate.</p>
+{% endblock %}

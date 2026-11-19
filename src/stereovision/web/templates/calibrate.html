@@ -1,113 +1,104 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Calibration Capture</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <main class="page">
-      <h1>Calibration capture</h1>
-      <img class="video-feed" src="{{ url_for('calibrate.video') }}"
-           alt="Live feed with detected board corners">
+{% extends "base.html" %}
+{% set pictures = [
+  {"src": url_for("calibrate.video", index=0), "alt": "Left camera with detected corners",
+   "caption": "Left camera"},
+  {"src": url_for("calibrate.video", index=1), "alt": "Right camera with detected corners",
+   "caption": "Right camera"},
+] %}
+{% block title %}Calibration{% endblock %}
+{% block panel %}
+  <h2>Capture board pairs</h2>
+  <div class="controls">
+    <button id="capture" type="button">Capture (space)</button>
+    <button id="auto" type="button" class="secondary" aria-pressed="false">Auto: off</button>
+    <button id="undo" type="button" class="secondary">Delete last</button>
+  </div>
+  <p class="readout">Saved pairs: <strong id="count">{{ count }}</strong></p>
+  <p id="auto-status" class="message"></p>
+  <p id="message" class="message" role="status"></p>
+  <details>
+    <summary>Tips</summary>
+    <ul>
+      <li>Aim for 20–30 pairs. Green corner counts mean the pair can be saved.</li>
+      <li>Auto: move to a pose, hold still ~1 s, it saves; then move to a clearly different
+        pose. Poses too similar to a saved one are skipped.</li>
+      <li>Cover the whole image: centre, all four corners and the edges.</li>
+      <li>Vary the distance (0.5–1.5 m) and tilt the board up to ~45° in different
+        directions.</li>
+    </ul>
+    <p class="small">Saved to <code>{{ folder }}</code></p>
+  </details>
+{% endblock %}
+{% block scripts %}
+<script>
+  const msg = document.getElementById("message");
+  const count = document.getElementById("count");
+  const autoBtn = document.getElementById("auto");
+  const autoStatus = document.getElementById("auto-status");
+  let autoOn = false;
+  let lastSeen = null;
 
-      <div class="controls">
-        <button id="capture" type="button">Capture pair (space)</button>
-        <button id="auto" type="button" class="secondary" aria-pressed="false">Auto capture: off</button>
-        <button id="undo" type="button" class="secondary">Delete last</button>
-        <span>Saved pairs: <strong id="count">{{ count }}</strong></span>
-      </div>
-      <p id="auto-status" class="message"></p>
-      <p id="message" class="message" role="status"></p>
+  function show(text, ok) {
+    msg.textContent = text;
+    msg.className = "message " + (ok ? "ok" : "error");
+  }
 
-      <details>
-        <summary>Tips for a good calibration</summary>
-        <ul>
-          <li>Aim for 20–30 pairs. Green corner counts mean the pair can be saved.</li>
-          <li>Auto capture: move to a pose, hold still ~1 s, it saves; then move to a clearly
-            different pose. It skips poses too similar to one already saved.</li>
-          <li>Cover the whole image: board in the centre, all four corners and the edges.</li>
-          <li>Vary the distance (about 0.5–1.5 m) and tilt the board up to ~45° in different directions.</li>
-          <li>Hold still while capturing; motion blur ruins the corners.</li>
-        </ul>
-        <p>Images are saved to <code>{{ folder }}</code>.</p>
-      </details>
-      <p><a href="{{ url_for('index') }}">Back to live view</a></p>
-    </main>
-    <script>
-      const msg = document.getElementById("message");
-      const count = document.getElementById("count");
+  async function post(url) {
+    return (await fetch(url, { method: "POST" })).json();
+  }
 
-      function show(text, ok) {
-        msg.textContent = text;
-        msg.className = "message " + (ok ? "ok" : "error");
-      }
+  async function capture() {
+    const r = await post("{{ url_for('calibrate.capture') }}");
+    count.textContent = r.count;
+    if (r.saved) {
+      show(`Saved pair ${r.index} — left ${r.left}, right ${r.right}, common ${r.common}`, true);
+    } else {
+      show(`Not saved: ${r.reason}`, false);
+    }
+  }
 
-      async function post(url) {
-        const resp = await fetch(url, { method: "POST" });
-        return resp.json();
-      }
+  async function undo() {
+    const r = await post("{{ url_for('calibrate.undo') }}");
+    count.textContent = r.count;
+    show(r.removed === null ? "Nothing to delete" : `Deleted pair ${r.removed}`, r.removed !== null);
+  }
 
-      async function capture() {
-        const r = await post("{{ url_for('calibrate.capture') }}");
-        count.textContent = r.count;
-        if (r.saved) {
-          show(`Saved pair ${r.index} — left ${r.left}, right ${r.right}, common ${r.common} corners`, true);
-        } else {
-          show(`Not saved: ${r.reason}`, false);
+  function renderAuto() {
+    autoBtn.textContent = "Auto: " + (autoOn ? "on" : "off");
+    autoBtn.className = autoOn ? "" : "secondary";
+    autoBtn.setAttribute("aria-pressed", String(autoOn));
+    if (!autoOn) autoStatus.textContent = "";
+  }
+
+  autoBtn.addEventListener("click", async () => {
+    const r = await post(autoOn ? "{{ url_for('calibrate.set_auto', mode='off') }}"
+                                : "{{ url_for('calibrate.set_auto', mode='on') }}");
+    autoOn = r.auto;
+    renderAuto();
+  });
+  document.getElementById("capture").addEventListener("click", capture);
+  document.getElementById("undo").addEventListener("click", undo);
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !e.repeat) { e.preventDefault(); capture(); }
+  });
+
+  async function poll() {
+    try {
+      const s = await (await fetch("{{ url_for('calibrate.get_state') }}")).json();
+      count.textContent = s.count;
+      autoOn = s.auto;
+      renderAuto();
+      if (s.mismatch) show(s.mismatch, false);
+      if (autoOn && s.message) autoStatus.textContent = "Auto: " + s.message;
+      if (s.last && s.last.index !== lastSeen) {
+        if (lastSeen !== null || autoOn) {
+          show(`Saved pair ${s.last.index} — common ${s.last.common} corners`, true);
         }
+        lastSeen = s.last.index;
       }
-
-      async function undo() {
-        const r = await post("{{ url_for('calibrate.undo') }}");
-        count.textContent = r.count;
-        show(r.removed === null ? "Nothing to delete" : `Deleted pair ${r.removed}`, r.removed !== null);
-      }
-
-      document.getElementById("capture").addEventListener("click", capture);
-      document.getElementById("undo").addEventListener("click", undo);
-      document.addEventListener("keydown", (e) => {
-        if (e.code === "Space" && !e.repeat) { e.preventDefault(); capture(); }
-      });
-
-      const autoBtn = document.getElementById("auto");
-      const autoStatus = document.getElementById("auto-status");
-      let autoOn = false;
-      let lastSeen = null;
-
-      function renderAuto() {
-        autoBtn.textContent = "Auto capture: " + (autoOn ? "on" : "off");
-        autoBtn.className = autoOn ? "" : "secondary";
-        autoBtn.setAttribute("aria-pressed", String(autoOn));
-        if (!autoOn) autoStatus.textContent = "";
-      }
-
-      autoBtn.addEventListener("click", async () => {
-        const r = await post(autoOn ? "{{ url_for('calibrate.set_auto', mode='off') }}"
-                                    : "{{ url_for('calibrate.set_auto', mode='on') }}");
-        autoOn = r.auto;
-        renderAuto();
-      });
-
-      async function poll() {
-        try {
-          const s = await (await fetch("{{ url_for('calibrate.get_state') }}")).json();
-          count.textContent = s.count;
-          autoOn = s.auto;
-          renderAuto();
-          if (s.mismatch) show(s.mismatch, false);
-          if (autoOn && s.message) autoStatus.textContent = "Auto: " + s.message;
-          if (s.last && s.last.index !== lastSeen) {
-            if (lastSeen !== null || autoOn) {
-              show(`Saved pair ${s.last.index} — common ${s.last.common} corners`, true);
-            }
-            lastSeen = s.last.index;
-          }
-        } catch (e) { /* server restarting; try again */ }
-        setTimeout(poll, 500);
-      }
-      poll();
-    </script>
-  </body>
-</html>
+    } catch (e) { /* server restarting; try again */ }
+    setTimeout(poll, 500);
+  }
+  poll();
+</script>
+{% endblock %}

@@ -2,41 +2,28 @@
 
 from __future__ import annotations
 
-import time
-from collections.abc import Iterator
-
-from flask import Blueprint, Response, jsonify, render_template
+from flask import Blueprint, jsonify, render_template
 
 from stereovision.detection.worker import DetectionWorker
 from stereovision.overlay import draw_objects
-from stereovision.web.stream import downscale, encode_jpeg
+from stereovision.web.stream import SharedRenderer, picture_response
 
 
 def create_blueprint(worker: DetectionWorker, model_name: str, jpeg_quality: int = 80,
                      preview_scale: float = 1.0) -> Blueprint:
     bp = Blueprint("objects", __name__, url_prefix="/objects")
 
-    def stream() -> Iterator[bytes]:
-        last_ts = None
-        while True:
-            result = worker.latest()
-            if result is None or result.frame.timestamp_ns == last_ts:
-                time.sleep(0.02)
-                continue
-            last_ts = result.frame.timestamp_ns
-            image = draw_objects(result.frame.left, result.objects)
-            jpeg = encode_jpeg(downscale(image, preview_scale), jpeg_quality)
-            if jpeg is not None:
-                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+    view = SharedRenderer(worker.latest, lambda result: result.frame.timestamp_ns,
+                          lambda result: (draw_objects(result.frame.left, result.objects),))
 
     @bp.route("/")
     def page():
         return render_template("objects.html", model=model_name,
                                classes=", ".join(worker.detector.classes))
 
-    @bp.route("/video")
-    def video():
-        return Response(stream(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    @bp.route("/video/<int:index>")
+    def video(index: int):
+        return picture_response(view, index, 1, jpeg_quality, preview_scale)
 
     @bp.route("/list")
     def list_objects():

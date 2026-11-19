@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 import threading
-import time
-from collections.abc import Iterator
 
 import cv2
 import numpy as np
-from flask import Blueprint, Response, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request
 
 from stereovision.config import DepthConfig
 from stereovision.depth.engine import DepthFrame, DepthWorker
 from stereovision.depth.measure import colorize_depth
 from stereovision.overlay import format_distance
-from stereovision.web.stream import downscale, encode_jpeg
+from stereovision.web.stream import SharedRenderer, picture_response
 
 WHITE, BLACK = (255, 255, 255), (0, 0, 0)
 
@@ -51,26 +49,16 @@ def create_blueprint(
             x, y = int(point["fx"] * (w - 1)), int(point["fy"] * (h - 1))
         return x, y, frame.distance_at(x, y, cfg.measure_radius_px)
 
-    def render(frame: DepthFrame) -> np.ndarray:
+    def render(frame: DepthFrame) -> tuple[np.ndarray, np.ndarray]:
         x, y, mm = measure(frame)
         left = frame.left.copy()
         draw_measurement(left, x, y, mm, cfg.measure_radius_px)
         heat = colorize_depth(frame.depth, cfg.display_min_mm, cfg.display_max_mm)
         heat = cv2.resize(heat, (left.shape[1], left.shape[0]), interpolation=cv2.INTER_NEAREST)
         draw_measurement(heat, x, y, mm, cfg.measure_radius_px)
-        return cv2.hconcat([left, heat])
+        return left, heat
 
-    def stream() -> Iterator[bytes]:
-        last_ts = None
-        while True:
-            frame = worker.latest()
-            if frame is None or frame.timestamp_ns == last_ts:
-                time.sleep(0.02)
-                continue
-            last_ts = frame.timestamp_ns
-            jpeg = encode_jpeg(downscale(render(frame), preview_scale), jpeg_quality)
-            if jpeg is not None:
-                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+    view = SharedRenderer(worker.latest, lambda frame: frame.timestamp_ns, render)
 
     @bp.route("/")
     def page():
@@ -79,9 +67,9 @@ def create_blueprint(
             closest_mm=worker.engine.min_distance_mm,
         )
 
-    @bp.route("/video")
-    def video():
-        return Response(stream(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    @bp.route("/video/<int:index>")
+    def video(index: int):
+        return picture_response(view, index, 2, jpeg_quality, preview_scale)
 
     @bp.route("/point", methods=["POST"])
     def set_point():

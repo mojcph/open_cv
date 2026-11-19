@@ -47,6 +47,12 @@ rpicam-hello --list-cameras
   `max_pair_dt_ms`.
 - With sync on, the stream starts about 3–4 s after launch, while the cameras align.
 
+All pages share one layout: picture 1 | picture 2 | side panel (page text and controls,
+then navigation). The header shows the camera sync status. As the window gets narrower,
+the panel moves below the pictures, and then everything stacks into one column. Pictures
+scale down to fit the window; only the display shrinks, not the stream. Each picture is
+its own stream (`/video/0`, `/video/1`, `/depth/video/0`, …).
+
 The server holds both cameras. Stop it (Ctrl+C) before running anything else that uses them.
 
 ## Calibration board
@@ -210,9 +216,10 @@ src/stereovision/
   detection/worker.py         DetectionWorker: frame -> depth -> detections -> distances
   overlay.py                  boxes with 'label distance' tags
   web/objects.py              /objects page and /objects/list JSON
-  web/stream.py               MJPEG streaming helpers
+  web/stream.py               SharedRenderer (one render per frame) + per-picture MJPEG streams
   web/calibrate.py            /calibrate page: overlay stream, capture, delete last
-  web/app.py                  Flask app: /, /video (MJPEG), /status, registers /calibrate
+  web/app.py                  Flask app, navigation, /, /video/<n>, /status, /rectified
+  web/templates/base.html     shared page layout (pictures, side panel, navigation)
   web/templates, web/static   HTML and CSS
 tests/                        pytest suite (hardware tests marked `hardware`)
 ```

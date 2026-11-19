@@ -121,9 +121,9 @@ def test_capture_endpoint_rejects_missing_board(running_rig, tmp_path):
 
 def test_calibrate_page_and_overlay_stream(running_rig, tmp_path):
     client, _ = make_client(running_rig, tmp_path, board_image(), board_image())
-    assert b"Capture pair" in client.get("/calibrate/").data
-    assert b"/calibrate/" in client.get("/").data
-    resp = client.get("/calibrate/video")
+    assert b"Capture (space)" in client.get("/calibrate/").data
+    assert b">Calibration<" in client.get("/").data
+    resp = client.get("/calibrate/video/0")
     assert next(resp.response).startswith(b"--frame\r\nContent-Type: image/jpeg")
     resp.close()
 
@@ -131,4 +131,4 @@ def test_calibrate_page_and_overlay_stream(running_rig, tmp_path):
 def test_calibration_disabled_without_board(running_rig):
     client = create_app(running_rig()).test_client()
     assert client.get("/calibrate/").status_code == 404
-    assert b"Calibration capture" not in client.get("/").data
+    assert b">Calibration<" not in client.get("/").data

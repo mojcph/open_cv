@@ -140,9 +140,9 @@ def test_rectified_page_and_stream(calibration, running_rig):
     rig = running_rig(left=FakeSource([img], fps=100), right=FakeSource([img], fps=100))
     assert wait_for(lambda: rig.latest() is not None)
     client = create_app(rig, rectifier=Rectifier(calibration), preview_scale=0.5).test_client()
-    assert b"Rectified view" in client.get("/").data
+    assert b">Rectified<" in client.get("/").data
     assert b"same green line" in client.get("/rectified").data
-    resp = client.get("/rectified/video")
+    resp = client.get("/rectified/video/1")
     assert next(resp.response).startswith(b"--frame\r\nContent-Type: image/jpeg")
     resp.close()
 
@@ -152,4 +152,4 @@ def test_rectified_disabled_without_calibration(running_rig):
 
     client = create_app(running_rig()).test_client()
     assert client.get("/rectified").status_code == 404
-    assert b"Rectified view" not in client.get("/").data
+    assert b">Rectified<" not in client.get("/").data

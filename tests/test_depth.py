@@ -143,8 +143,8 @@ def test_worker_idles_without_requests(depth_rig):
 def test_depth_endpoints(depth_rig, worker):
     client = create_app(depth_rig, depth_worker=worker,
                         depth_cfg=DepthConfig(num_disparities=64)).test_client()
-    assert b"Distance" in client.get("/").data
-    assert b"Closest measurable distance" in client.get("/depth/").data
+    assert b">Distance<" in client.get("/").data
+    assert b"Closest measurable" in client.get("/depth/").data
     assert wait_for(lambda: client.get("/depth/measure").get_json()["distance_mm"] is not None,
                     timeout=5)
     m = client.get("/depth/measure").get_json()
@@ -157,7 +157,7 @@ def test_depth_endpoints(depth_rig, worker):
     assert client.post("/depth/point", json={"fx": 2}).status_code == 400
     assert client.post("/depth/point", data="nope").status_code == 400
 
-    resp = client.get("/depth/video")
+    resp = client.get("/depth/video/0")
     assert next(resp.response).startswith(b"--frame\r\nContent-Type: image/jpeg")
     resp.close()
 

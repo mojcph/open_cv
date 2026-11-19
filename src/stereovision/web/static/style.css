@@ -1,50 +1,220 @@
+/* Layout: picture 1 | picture 2 | side panel (text + navigation).
+   Wide (>= 1200px): 3 columns.  Medium: pictures side by side, panel below.
+   Narrow (< 700px): everything stacked.  Single-picture pages drop the second column. */
+
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --text: #1f2933;
+  --muted: #57606a;
+  --border: #d0d7de;
+  --accent: #0969da;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --error: #cf222e;
+  --header-h: 3rem;
+  --gap: 1rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  padding: 1.5rem;
-  background: #f4f6f8;
-  color: #1f2933;
+  background: var(--bg);
+  color: var(--text);
   font-family: Arial, sans-serif;
-}
-
-.page {
-  max-width: 1280px;
-  margin: 0 auto;
-}
-
-h1 {
-  font-size: 1.5rem;
-}
-
-/* Scale the stream down to fit the window in both directions, keeping its aspect ratio.
-   Only the display shrinks; the image itself keeps its full resolution. */
-.video-feed {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100vh - 10rem); /* leave room for the title and the controls */
-  width: auto;
-  height: auto;
-  margin: 0 auto;
-  object-fit: contain;
+  line-height: 1.4;
 }
 
 a {
-  color: #0969da;
+  color: var(--accent);
 }
+
+code {
+  font-size: 0.9em;
+}
+
+/* --- header -------------------------------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-height: var(--header-h);
+  padding: 0.5rem var(--gap);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.status {
+  font-size: 0.9rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.status.ok {
+  color: var(--ok);
+}
+
+.status.warn {
+  color: var(--warn);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+/* --- grid ---------------------------------------------------------------------------------- */
+
+.layout {
+  display: grid;
+  gap: var(--gap);
+  padding: var(--gap);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(16rem, 20rem);
+  align-items: start;
+}
+
+.layout.single {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+}
+
+.picture {
+  margin: 0;
+  min-width: 0;
+}
+
+/* Scale each picture to fit its column AND the window height, keeping the aspect ratio.
+   Only the display shrinks; the stream keeps its resolution. */
+.feed {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - var(--header-h) - 4.5rem);
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  background: #000;
+  border-radius: 4px;
+}
+
+.picture figcaption {
+  margin-top: 0.3rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.clickable {
+  cursor: crosshair;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-width: 0;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.panel p {
+  margin: 0.5rem 0;
+}
+
+/* Medium: pictures side by side, the side panel moves below them (text | navigation). */
+@media (max-width: 1199px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .layout.single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(12rem, 1fr);
+    align-items: start;
+  }
+}
+
+/* Narrow: one column, everything stacked. */
+@media (max-width: 699px) {
+  .layout,
+  .layout.single,
+  .side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feed {
+    max-height: none;
+  }
+}
+
+/* --- navigation ---------------------------------------------------------------------------- */
+
+.nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.nav a {
+  display: block;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.nav a:hover {
+  background: var(--bg);
+}
+
+.nav a[aria-current="page"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* --- controls and readouts ----------------------------------------------------------------- */
 
 .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
 }
 
 button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.95rem;
   border: 0;
   border-radius: 4px;
-  background: #0969da;
+  background: var(--accent);
   color: #fff;
   cursor: pointer;
 }
@@ -53,24 +223,49 @@ button.secondary {
   background: #6e7781;
 }
 
+.readout {
+  font-size: 1.1rem;
+}
+
+.readout.big {
+  font-size: 2rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.stats dt {
+  color: var(--muted);
+}
+
+.stats dd {
+  margin: 0;
+}
+
 .message {
-  min-height: 1.5em;
+  min-height: 1.4em;
 }
 
 .message.ok {
-  color: #1a7f37;
+  color: var(--ok);
 }
 
 .message.error {
-  color: #cf222e;
+  color: var(--error);
 }
 
-.clickable {
-  cursor: crosshair;
+.small {
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
-.readout {
-  font-size: 1.25rem;
+details summary {
+  cursor: pointer;
 }
 
 .table-wrap {
@@ -79,12 +274,12 @@ button.secondary {
 
 table {
   border-collapse: collapse;
-  min-width: 20rem;
+  width: 100%;
 }
 
 th,
 td {
-  padding: 0.35rem 0.75rem;
-  border-bottom: 1px solid #d0d7de;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--border);
   text-align: left;
 }

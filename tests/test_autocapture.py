@@ -106,7 +106,7 @@ def read_frames(resp, n):
 def test_auto_capture_endpoint_saves_once(running_rig, tmp_path):
     client, store = client_for(running_rig, tmp_path)
     assert client.post("/calibrate/auto/on").get_json() == {"auto": True}
-    read_frames(client.get("/calibrate/video"), 10)
+    read_frames(client.get("/calibrate/video/0"), 10)
     assert store.count() == 1  # static scene: one save, then "already captured"
     state = client.get("/calibrate/state").get_json()
     assert state["auto"] is True and "already captured" in state["message"]
@@ -117,16 +117,16 @@ def test_auto_capture_endpoint_saves_once(running_rig, tmp_path):
 
 def test_auto_off_does_not_save(running_rig, tmp_path):
     client, store = client_for(running_rig, tmp_path)
-    read_frames(client.get("/calibrate/video"), 8)
+    read_frames(client.get("/calibrate/video/0"), 8)
     assert store.count() == 0
 
 
 def test_preview_scale_halves_stream(running_rig, tmp_path):
     client, _ = client_for(running_rig, tmp_path, scale=0.5)
-    chunk = read_frames(client.get("/video"), 1)[0]
+    chunk = read_frames(client.get("/video/1"), 1)[0]
     jpeg = chunk[chunk.index(b"\xff\xd8"):]
     img = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
-    assert img.shape == (240, 640, 3)  # two 640x480 images side by side, halved
+    assert img.shape == (240, 320, 3)  # one 640x480 camera image, halved
 
 
 @pytest.mark.parametrize("kw", [{"preview_scale": 0.0}, {"preview_scale": 1.5},

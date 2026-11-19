@@ -1,59 +1,54 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Objects</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <main class="page">
-      <h1>Objects and distances</h1>
-      <img class="video-feed" src="{{ url_for('objects.video') }}"
-           alt="Rectified left image with detected objects and their distances">
-      <div class="controls">
-        <span>Detection rate: <span id="fps">–</span> /s</span>
-        <span>Model: {{ model }}</span>
-      </div>
-      <p id="message" class="message error" role="status"></p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Object</th><th>Distance</th><th>Confidence</th></tr></thead>
-          <tbody id="rows"><tr><td colspan="3">–</td></tr></tbody>
-        </table>
-      </div>
-      <p>Looking for: {{ classes }}. Change the list under <code>detection.classes</code> in
-        the config, then re-run <code>scripts/export_detector.py</code>. Distance = median depth
-        inside the middle of each box; "no depth" means the object has too little texture.</p>
-      <p><a href="{{ url_for('index') }}">Back to live view</a></p>
-    </main>
-    <script>
-      function fmt(mm) {
-        if (mm === null) return "no depth";
-        return mm >= 1000 ? (mm / 1000).toFixed(2) + " m" : Math.round(mm) + " mm";
-      }
+{% extends "base.html" %}
+{% set pictures = [
+  {"src": url_for("objects.video", index=0),
+   "alt": "Rectified left image with detected objects and their distances",
+   "caption": "Rectified left — detections"},
+] %}
+{% block title %}Objects{% endblock %}
+{% block panel %}
+  <h2>Objects</h2>
+  <dl class="stats">
+    <dt>Rate</dt><dd><span id="fps">–</span> /s</dd>
+    <dt>Model</dt><dd>{{ model }}</dd>
+  </dl>
+  <p id="message" class="message error" role="status"></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Object</th><th>Distance</th><th>Conf.</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="3">–</td></tr></tbody>
+    </table>
+  </div>
+  <p class="small">Looking for: {{ classes }}. Change <code>detection.classes</code> in the
+    config, then re-run <code>scripts/export_detector.py</code>. Distance = median depth in the
+    middle of each box; "no depth" = too little texture, or too close.</p>
+{% endblock %}
+{% block scripts %}
+<script>
+  function fmt(mm) {
+    if (mm === null) return "no depth";
+    return mm >= 1000 ? (mm / 1000).toFixed(2) + " m" : Math.round(mm) + " mm";
+  }
 
-      async function poll() {
-        try {
-          const r = await (await fetch("{{ url_for('objects.list_objects') }}")).json();
-          document.getElementById("fps").textContent = r.fps;
-          document.getElementById("message").textContent = r.error || "";
-          const rows = document.getElementById("rows");
-          rows.replaceChildren(...(r.objects.length ? r.objects : [null]).map((o) => {
-            const tr = document.createElement("tr");
-            const cells = o ? [o.label, fmt(o.distance_mm), Math.round(o.confidence * 100) + "%"]
-                            : ["nothing detected", "", ""];
-            for (const text of cells) {
-              const td = document.createElement("td");
-              td.textContent = text;
-              tr.appendChild(td);
-            }
-            return tr;
-          }));
-        } catch (e) { /* server restarting */ }
-        setTimeout(poll, 500);
-      }
-      poll();
-    </script>
-  </body>
-</html>
+  async function poll() {
+    try {
+      const r = await (await fetch("{{ url_for('objects.list_objects') }}")).json();
+      document.getElementById("fps").textContent = r.fps;
+      document.getElementById("message").textContent = r.error || "";
+      const rows = document.getElementById("rows");
+      rows.replaceChildren(...(r.objects.length ? r.objects : [null]).map((o) => {
+        const tr = document.createElement("tr");
+        const cells = o ? [o.label, fmt(o.distance_mm), Math.round(o.confidence * 100) + "%"]
+                        : ["nothing detected", "", ""];
+        for (const text of cells) {
+          const td = document.createElement("td");
+          td.textContent = text;
+          tr.appendChild(td);
+        }
+        return tr;
+      }));
+    } catch (e) { /* server restarting */ }
+    setTimeout(poll, 500);
+  }
+  poll();
+</script>
+{% endblock %}

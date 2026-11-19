@@ -16,7 +16,7 @@ from stereovision.calibration.capture import (
     draw_view,
 )
 from stereovision.camera.stereo_rig import StereoRig
-from stereovision.web.stream import mjpeg_response
+from stereovision.web.stream import SharedRenderer, picture_response
 
 
 def create_blueprint(
@@ -54,18 +54,22 @@ def create_blueprint(
         with lock:
             if state["auto"] and auto.update(det, pair.left.image.shape[1]):
                 save(pair, det)
-        return cv2.hconcat([draw_view(pair.left.image, det.left, good),
-                            draw_view(pair.right.image, det.right, good)])
+        return (draw_view(pair.left.image, det.left, good),
+                draw_view(pair.right.image, det.right, good))
+
+    # One render per frame shared by the left and right picture streams, so corner
+    # detection (and auto-capture) runs once per frame, not once per picture.
+    overlay = SharedRenderer(rig.latest, lambda pair: pair.left.timestamp_ns, render_overlay)
 
     @bp.route("/")
     def page():
         return render_template("calibrate.html", count=store.count(), folder=str(store.folder))
 
-    @bp.route("/video")
-    def video():
+    @bp.route("/video/<int:index>")
+    def video(index: int):
         # Corner detection costs ~30-60 ms per pair, so the preview runs at a lower rate.
-        # Auto-capture runs inside this stream: it works while the page is open.
-        return mjpeg_response(rig, render_overlay, jpeg_quality, max_fps=10, scale=preview_scale)
+        # Auto-capture runs inside these streams: it works while the page is open.
+        return picture_response(overlay, index, 2, jpeg_quality, preview_scale, max_fps=10)
 
     @bp.route("/state")
     def get_state():

@@ -122,14 +122,14 @@ def test_objects_endpoints(detection_setup):
     rig, depth, det = detection_setup
     client = create_app(rig, depth_worker=depth, detection_worker=det,
                         model_name="test-model").test_client()
-    assert b"Objects" in client.get("/").data
+    assert b">Objects<" in client.get("/").data
     page = client.get("/objects/").data
     assert b"test-model" in page and b"Looking for: cup" in page
     assert wait_for(lambda: client.get("/objects/list").get_json()["objects"], timeout=5)
     data = client.get("/objects/list").get_json()
     assert data["objects"][0]["label"] == "cup"
     assert data["objects"][0]["distance_mm"] == pytest.approx(EXPECTED_MM, rel=0.02)
-    resp = client.get("/objects/video")
+    resp = client.get("/objects/video/0")
     assert next(resp.response).startswith(b"--frame\r\nContent-Type: image/jpeg")
     resp.close()
 

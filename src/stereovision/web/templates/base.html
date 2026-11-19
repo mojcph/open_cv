@@ -1,0 +1,71 @@
+<!doctype html>
+{#- Shared layout. A page sets `pictures` (1 or 2 dicts: src, alt, caption, cls) at the top
+    level, and fills the `panel` and `scripts` blocks. Columns: picture 1 | picture 2 | side
+    panel (text + navigation); they stack as the window gets narrower. -#}
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{% endblock %} · Pi stereo rig</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>{{ self.title() }}</h1>
+      <span id="rig-status" class="status" role="status">connecting…</span>
+    </header>
+
+    <main class="layout{% if pictures | length == 1 %} single{% endif %}">
+      {% for pic in pictures %}
+      <figure class="picture">
+        <img id="pic{{ loop.index }}" class="feed {{ pic.cls | default('') }}" src="{{ pic.src }}"
+             alt="{{ pic.alt }}">
+        <figcaption>{{ pic.caption }}</figcaption>
+      </figure>
+      {% endfor %}
+
+      <aside class="side">
+        <section class="panel">
+          {% block panel %}{% endblock %}
+        </section>
+        <nav class="panel nav" aria-label="Pages">
+          <h2>Pages</h2>
+          <ul>
+            {% for label, url, active in nav %}
+            <li><a href="{{ url }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a></li>
+            {% endfor %}
+          </ul>
+          <p class="small"><a href="{{ url_for('camera_status') }}">Camera status (JSON)</a></p>
+        </nav>
+      </aside>
+    </main>
+
+    <script>
+      // Header status line: camera state and left/right sync, on every page.
+      const rigStatus = document.getElementById("rig-status");
+      async function pollStatus() {
+        try {
+          const s = await (await fetch("{{ url_for('camera_status') }}")).json();
+          const running = s.left === "Running" && s.right === "Running";
+          if (running && s.in_sync) {
+            rigStatus.textContent = `cameras in sync · Δ ${s.pair_dt_ms} ms`;
+            rigStatus.className = "status ok";
+          } else if (running) {
+            rigStatus.textContent = `out of sync · Δ ${s.pair_dt_ms} ms`;
+            rigStatus.className = "status warn";
+          } else {
+            rigStatus.textContent = `left: ${s.left} · right: ${s.right}`;
+            rigStatus.className = String(s.left + s.right).includes("ERROR") ? "status error"
+                                                                               : "status warn";
+          }
+        } catch (e) {
+          rigStatus.textContent = "server not reachable";
+          rigStatus.className = "status error";
+        }
+        setTimeout(pollStatus, 2000);
+      }
+      pollStatus();
+    </script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
