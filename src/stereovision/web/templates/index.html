@@ -1,11 +1,11 @@
 {% extends "base.html" %}
+{% set rate_stream = "video" %}
 {% set pictures = [
   {"src": url_for("video", index=0), "alt": "Left camera", "caption": "Left camera"},
   {"src": url_for("video", index=1), "alt": "Right camera", "caption": "Right camera"},
 ] %}
 {% block title %}Live view{% endblock %}
 {% block panel %}
-  <h2>Live view</h2>
   <p>Both cameras, rotated and time-synchronised. Nearby objects should appear further
     <strong>left</strong> in the right image; if not, toggle
     <code>camera.swap_left_right</code> in the config.</p>

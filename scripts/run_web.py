@@ -74,6 +74,9 @@ def load_detector(cfg):
 
 def port_in_use(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        # Like the web server itself, ignore connections closed moments ago (TIME_WAIT);
+        # only a program actually listening on the port makes the bind fail.
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind((host, port))
         except OSError:
@@ -96,7 +99,7 @@ def main() -> int:
     if port_in_use(cfg.web.host, cfg.web.port):
         print(f"ERROR: port {cfg.web.port} is already in use - another run_web.py is probably "
               "still running (and holding the cameras).\n"
-              "Stop it with Ctrl+C in its terminal, or:  pkill -f scripts/run_web.py")
+              "Stop it with Ctrl+C in its terminal, or:  pkill -f run_web.py")
         return 1
 
     cam = cfg.camera
@@ -132,7 +135,7 @@ def main() -> int:
         print(f"ERROR: {problem}")
         if "busy" in problem.lower() or "did not complete" in problem.lower():
             print("The cameras are in use by another program. Stop it, e.g.:  "
-                  "pkill -f scripts/run_web.py")
+                  "pkill -f run_web.py")
         return 1
     print("Cameras running and in sync.", flush=True)
     for worker in (depth_worker, detection_worker):

@@ -1,16 +1,16 @@
 {% extends "base.html" %}
+{% set rate_stream = "objects.video" %}
 {% set pictures = [
   {"src": url_for("objects.video", index=0),
    "alt": "Rectified left image with detected objects and their distances",
    "caption": "Rectified left — detections"},
 ] %}
 {% block title %}Objects{% endblock %}
+{% block stats %}
+  <dt>Detection rate</dt><dd><span id="fps">–</span> /s</dd>
+  <dt>Model</dt><dd>{{ model }}</dd>
+{% endblock %}
 {% block panel %}
-  <h2>Objects</h2>
-  <dl class="stats">
-    <dt>Rate</dt><dd><span id="fps">–</span> /s</dd>
-    <dt>Model</dt><dd>{{ model }}</dd>
-  </dl>
   <p id="message" class="message error" role="status"></p>
   <div class="table-wrap">
     <table>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set rate_stream = "calibrate.video" %}
 {% set pictures = [
   {"src": url_for("calibrate.video", index=0), "alt": "Left camera with detected corners",
    "caption": "Left camera"},
@@ -6,8 +7,8 @@
    "caption": "Right camera"},
 ] %}
 {% block title %}Calibration{% endblock %}
+{% block heading %}Capture board pairs{% endblock %}
 {% block panel %}
-  <h2>Capture board pairs</h2>
   <div class="controls">
     <button id="capture" type="button">Capture (space)</button>
     <button id="auto" type="button" class="secondary" aria-pressed="false">Auto: off</button>

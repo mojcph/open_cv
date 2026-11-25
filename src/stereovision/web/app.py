@@ -11,7 +11,7 @@ from stereovision.config import DepthConfig
 from stereovision.depth.engine import DepthWorker
 from stereovision.depth.rectify import Rectifier, draw_epipolar_lines
 from stereovision.detection.worker import DetectionWorker
-from stereovision.web.stream import SharedRenderer, picture_response
+from stereovision.web.stream import SharedRenderer, picture_rates, picture_response
 
 
 def pair_renderer(rig: StereoRig, render) -> SharedRenderer[StereoFrame]:
@@ -54,7 +54,8 @@ def create_app(
 
     @app.route("/status")
     def camera_status():
-        return jsonify(rig.status() | rig.sync_info())
+        return jsonify(rig.status() | rig.sync_info()
+                       | {"camera_fps": rig.camera_fps(), "picture_fps": picture_rates()})
 
     if board is not None and store is not None:
         from stereovision.web.calibrate import create_blueprint

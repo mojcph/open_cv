@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set rate_stream = "depth.video" %}
 {% set pictures = [
   {"src": url_for("depth.video", index=0), "alt": "Rectified left image with crosshair",
    "caption": "Rectified left — click to measure", "cls": "clickable"},
@@ -6,20 +7,19 @@
    "caption": "Depth heatmap — click to measure", "cls": "clickable"},
 ] %}
 {% block title %}Distance{% endblock %}
+{% block stats %}
+  <dt>Distance (direct line)</dt><dd id="distance">–</dd>
+  <dt>Depth (Z)</dt><dd id="depthz">–</dd>
+  <dt>Depth rate</dt><dd><span id="fps">–</span> fps</dd>
+  <dt>Valid pixels</dt><dd id="valid">–</dd>
+{% endblock %}
 {% block panel %}
-  <h2>Distance</h2>
-  <p class="readout big"><strong id="distance">–</strong></p>
-  <p class="small">Straight line from the midpoint between the cameras.</p>
-  <dl class="stats">
-    <dt>Depth (Z)</dt><dd id="depthz">–</dd>
-    <dt>Depth rate</dt><dd><span id="fps">–</span> fps</dd>
-    <dt>Valid pixels</dt><dd id="valid">–</dd>
-  </dl>
   <div class="controls">
     <button id="centre" type="button" class="secondary">Centre</button>
   </div>
   <p id="message" class="message error" role="status"></p>
-  <p class="small">Click either picture to measure there (median over a small circle).
+  <p class="small">Distance is the straight line from the midpoint between the cameras.
+    Click either picture to measure there (median over a small circle).
     Depth (Z) is measured straight ahead along the camera axis; the heatmap shows Z.
     Heatmap: red = near ({{ (min_mm / 1000) | round(2) }} m), blue = far
     ({{ (max_mm / 1000) | round(1) }} m), black = no depth (no texture, or only one camera
@@ -45,8 +45,7 @@
   document.getElementById("centre").addEventListener("click", () => setPoint(0.5, 0.5));
 
   function fmt(mm) {
-    if (mm === null) return "no depth";
-    return mm >= 1000 ? (mm / 1000).toFixed(2) + " m" : Math.round(mm) + " mm";
+    return mm === null ? "no depth" : Math.round(mm) + " mm";
   }
 
   async function poll() {
@@ -55,9 +54,9 @@
       document.getElementById("distance").textContent = fmt(m.distance_mm);
       document.getElementById("depthz").textContent =
         m.depth_mm === undefined ? "–" : fmt(m.depth_mm);
-      document.getElementById("fps").textContent = m.fps;
+      document.getElementById("fps").textContent = m.fps.toFixed(1);
       document.getElementById("valid").textContent =
-        m.valid_fraction === undefined ? "–" : Math.round(m.valid_fraction * 100) + "%";
+        m.valid_fraction === undefined ? "–" : Math.round(m.valid_fraction * 100) + " %";
       document.getElementById("message").textContent = m.error || "";
     } catch (e) { /* server restarting */ }
     setTimeout(poll, 300);

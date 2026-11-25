@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set rate_stream = "rectified_video" %}
 {% set pictures = [
   {"src": url_for("rectified_video", index=0), "alt": "Rectified left image with guide lines",
    "caption": "Rectified left"},
@@ -6,8 +7,8 @@
    "caption": "Rectified right"},
 ] %}
 {% block title %}Rectified{% endblock %}
+{% block heading %}Calibration check{% endblock %}
 {% block panel %}
-  <h2>Calibration check</h2>
   <p>With a good calibration, every feature sits on the <strong>same green line</strong> in
     both images, and straight edges look straight.</p>
   <p>If features drift above or below each other, or the images look warped or strongly

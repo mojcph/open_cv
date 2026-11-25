@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from collections.abc import Callable, Iterator
 from typing import Generic, TypeVar
 
 import cv2
 import numpy as np
-from flask import Response, abort, current_app
+from flask import Response, abort, current_app, request
 
 T = TypeVar("T")
 
@@ -47,6 +48,16 @@ class SharedRenderer(Generic[T]):
         self._last_key: int | None = None
         self._pictures: tuple[np.ndarray, ...] = ()
         self.renders = 0  # how many times render() actually ran (for tests/diagnostics)
+        self._render_times: deque[float] = deque(maxlen=30)
+
+    def fps(self, window_s: float = 3.0) -> float:
+        """New pictures per second over the last window_s seconds (0 when nobody watches)."""
+        now = time.monotonic()
+        with self._lock:
+            recent = [t for t in self._render_times if now - t <= window_s]
+        if len(recent) < 2:
+            return 0.0
+        return (len(recent) - 1) / (recent[-1] - recent[0])
 
     def get(self) -> tuple[int, tuple[np.ndarray, ...]] | None:
         item = self._source()
@@ -58,6 +69,7 @@ class SharedRenderer(Generic[T]):
                 self._pictures = self._render(item)
                 self._last_key = k
                 self.renders += 1
+                self._render_times.append(time.monotonic())
             return k, self._pictures
 
 
@@ -82,8 +94,16 @@ def picture_response(renderer: SharedRenderer, index: int, count: int, jpeg_qual
                      scale: float = 1.0, max_fps: float = 30.0) -> Response:
     if not 0 <= index < count:
         abort(404)
+    # Remember the renderer by its stream endpoint, so /status can report its picture rate.
+    current_app.extensions.setdefault("picture_renderers", {})[request.endpoint] = renderer
     cap = current_app.config.get("STREAM_MAX_FPS")  # app-wide limit from web.max_fps
     if cap:
         max_fps = min(max_fps, cap)
     return Response(picture_stream(renderer, index, jpeg_quality, scale, max_fps),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
+
+
+def picture_rates() -> dict[str, float]:
+    """Picture rate of every stream that has been opened, by stream endpoint."""
+    renderers = current_app.extensions.get("picture_renderers", {})
+    return {endpoint: round(r.fps(), 1) for endpoint, r in renderers.items()}

@@ -146,6 +146,18 @@ class StereoRig:
         """Newest time-matched left/right pair, or None if none is within max_pair_dt_ns."""
         return pair_nearest(*self._snapshot(), self.max_pair_dt_ns)
 
+    def camera_fps(self) -> float | None:
+        """Frame rate of the slower camera, from its sensor timestamps (None before frames)."""
+        rates = []
+        for frames in self._snapshot():
+            if len(frames) < 2:
+                return None
+            span_ns = frames[-1].timestamp_ns - frames[0].timestamp_ns
+            if span_ns <= 0:
+                return None
+            rates.append((len(frames) - 1) * 1e9 / span_ns)
+        return round(min(rates), 1)
+
     def sync_info(self) -> dict:
         """Timing of the best available pair, ignoring the limit — for /status."""
         pair = pair_nearest(*self._snapshot())

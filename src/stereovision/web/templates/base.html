@@ -1,6 +1,8 @@
 <!doctype html>
-{#- Shared layout. A page sets `pictures` (1 or 2 dicts: src, alt, caption, cls) at the top
-    level, and fills the `panel` and `scripts` blocks. Columns: picture 1 | picture 2 | side
+{#- Shared layout. A page sets `pictures` (1 or 2 dicts: src, alt, caption, cls) and
+    `rate_stream` (the endpoint of its picture stream, for "Picture rate") at the top
+    level, and fills the `panel` and `scripts` blocks (`heading` defaults to the title; `stats` adds
+    <dt>/<dd> rows below the picture rate). Columns: picture 1 | picture 2 | side
     panel (text + navigation); they stack as the window gets narrower. -#}
 <html lang="en">
   <head>
@@ -25,9 +27,6 @@
       {% endfor %}
 
       <aside class="side">
-        <section class="panel">
-          {% block panel %}{% endblock %}
-        </section>
         <nav class="panel nav" aria-label="Pages">
           <h2>Pages</h2>
           <ul>
@@ -37,32 +36,53 @@
           </ul>
           <p class="small"><a href="{{ url_for('camera_status') }}">Camera status (JSON)</a></p>
         </nav>
+        <section class="panel">
+          <h2>{% block heading %}{{ self.title() }}{% endblock %}</h2>
+          {#- One table for all readouts, so labels and values line up in two columns. -#}
+          {% set stats %}{% block stats %}{% endblock %}{% endset %}
+          {% if rate_stream is defined or stats | trim %}
+          <dl class="stats">
+            {% if rate_stream is defined %}
+            <dt>Picture rate</dt><dd><span id="picture-fps">–</span> fps</dd>
+            {% endif %}
+            {{ stats }}
+          </dl>
+          {% endif %}
+          {% block panel %}{% endblock %}
+        </section>
       </aside>
     </main>
 
     <script>
       // Header status line: camera state and left/right sync, on every page.
       const rigStatus = document.getElementById("rig-status");
+      const pictureFps = document.getElementById("picture-fps");
+      const rateStream = {{ (rate_stream if rate_stream is defined else none) | tojson }};
       async function pollStatus() {
         try {
           const s = await (await fetch("{{ url_for('camera_status') }}")).json();
           const running = s.left === "Running" && s.right === "Running";
+          const fps = s.camera_fps === null ? "" : ` · ${s.camera_fps} fps`;
           if (running && s.in_sync) {
-            rigStatus.textContent = `cameras in sync · Δ ${s.pair_dt_ms} ms`;
+            rigStatus.textContent = `cameras in sync · Δ ${s.pair_dt_ms} ms${fps}`;
             rigStatus.className = "status ok";
           } else if (running) {
-            rigStatus.textContent = `out of sync · Δ ${s.pair_dt_ms} ms`;
+            rigStatus.textContent = `out of sync · Δ ${s.pair_dt_ms} ms${fps}`;
             rigStatus.className = "status warn";
           } else {
             rigStatus.textContent = `left: ${s.left} · right: ${s.right}`;
             rigStatus.className = String(s.left + s.right).includes("ERROR") ? "status error"
                                                                                : "status warn";
           }
+          if (pictureFps) {
+            const rate = s.picture_fps[rateStream];
+            pictureFps.textContent = rate === undefined ? "–" : rate.toFixed(1);
+          }
         } catch (e) {
           rigStatus.textContent = "server not reachable";
           rigStatus.className = "status error";
         }
-        setTimeout(pollStatus, 2000);
+        setTimeout(pollStatus, 1000);
       }
       pollStatus();
     </script>

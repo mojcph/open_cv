@@ -1,4 +1,4 @@
-/* Layout: picture 1 | picture 2 | side panel (text + navigation).
+/* Layout: picture 1 | picture 2 | side panel (navigation + text).
    Wide (>= 1200px): 3 columns.  Medium: pictures side by side, panel below.
    Narrow (< 700px): everything stacked.  Single-picture pages drop the second column. */
 
@@ -141,7 +141,7 @@ code {
   margin: 0.5rem 0;
 }
 
-/* Medium: pictures side by side, the side panel moves below them (text | navigation). */
+/* Medium: pictures side by side, the side panel moves below them (navigation | text). */
 @media (max-width: 1199px) {
   .layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -154,7 +154,7 @@ code {
   .side {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(12rem, 1fr);
+    grid-template-columns: minmax(12rem, 1fr) minmax(0, 2fr);
     align-items: start;
   }
 }
@@ -227,11 +227,6 @@ button.secondary {
   font-size: 1.1rem;
 }
 
-.readout.big {
-  font-size: 2rem;
-  margin: 0.25rem 0 0.5rem;
-}
-
 .stats {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -245,6 +240,7 @@ button.secondary {
 
 .stats dd {
   margin: 0;
+  font-variant-numeric: tabular-nums; /* digits keep their width as values change */
 }
 
 .message {

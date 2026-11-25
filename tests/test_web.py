@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pytest
 
 from conftest import make_image, wait_for
 from stereovision.web.app import create_app
@@ -106,3 +107,36 @@ def test_invalid_max_fps():
     for bad in (0, 60):
         with pytest.raises(ValueError, match="max_fps"):
             WebConfig(max_fps=bad)
+
+
+def test_shared_renderer_fps(monkeypatch):
+    import stereovision.web.stream as stream
+
+    clock = [100.0]
+    monkeypatch.setattr(stream.time, "monotonic", lambda: clock[0])
+    item = {"key": 0}
+    r = SharedRenderer(lambda: item, lambda it: it["key"], lambda it: ())
+    assert r.fps() == 0.0
+    for k in range(5):  # a new picture every 0.1 s -> 10 fps
+        item["key"] = k
+        r.get()
+        clock[0] += 0.1
+    assert r.fps() == pytest.approx(10.0)
+    clock[0] += 10  # nobody watching any more
+    assert r.fps() == 0.0
+
+
+def test_status_reports_camera_and_picture_rates(running_rig):
+    rig = running_rig()
+    client = create_app(rig).test_client()
+    assert wait_for(lambda: client.get("/status").get_json()["camera_fps"] is not None)
+    data = client.get("/status").get_json()
+    assert data["camera_fps"] > 0 and data["picture_fps"] == {}
+    stream = client.get("/video/0", buffered=False)
+    chunks = stream.response  # read a few pictures
+    for _ in range(3):
+        next(chunks)
+    stream.close()
+    assert "video" in client.get("/status").get_json()["picture_fps"]
+    html = client.get("/").get_data(as_text=True)
+    assert "Picture rate" in html and '"video"' in html
