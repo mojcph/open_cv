@@ -76,10 +76,20 @@ class DetectionWorker:
         with self._lock:
             return self._latest
 
+    def peek(self) -> ObjectFrame | None:
+        """Newest result without counting as a request (doesn't keep the worker awake)."""
+        with self._lock:
+            return self._latest
+
+    @property
+    def active(self) -> bool:
+        """True while someone has asked for results within the last idle_s seconds."""
+        return time.monotonic() - self._last_request <= self.idle_s
+
     def _run(self) -> None:
         last_ts = None
         while not self._stop.is_set():
-            if time.monotonic() - self._last_request > self.idle_s:
+            if not self.active:
                 time.sleep(0.1)
                 continue
             pair = self.rig.latest()

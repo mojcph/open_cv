@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -180,3 +181,40 @@ def test_measure_objects_distance_from_midpoint():
     assert obj.depth_mm == pytest.approx(1000.0)
     # box centre (320, 240) is on the left camera's axis: 44 mm left of the midpoint
     assert obj.distance_mm == pytest.approx((1000.0**2 + 44.0**2) ** 0.5)
+
+
+def test_peek_does_not_wake_detection_worker(running_rig):
+    det = DetectionWorker(running_rig(), make_engine(), NullDetector(), idle_s=0.2)
+    assert not det.active
+    det.peek()
+    assert not det.active
+    det.latest()
+    assert det.active
+
+
+def test_depth_worker_defers_to_active_detection(running_rig):
+    left, right = textured_pair()
+    rig = running_rig(left=FakeSource([left], fps=60), right=FakeSource([right], fps=60))
+    det = DetectionWorker(rig, make_engine(), FixedDetector([("cup", 0.9, (0.3, 0.3, 0.7, 0.7))]),
+                          idle_s=0.5)
+    depth = DepthWorker(rig, make_engine(), idle_s=0.5, defer_to=det)
+    det.start()
+    depth.start()
+    try:
+        # /objects open: depth serves the detection worker's frames and computes nothing itself
+        assert wait_for(lambda: det.latest() is not None, timeout=5)
+        for _ in range(5):
+            det.latest()
+            frame = depth.latest()
+            assert frame is det.peek().frame
+            time.sleep(0.05)
+        assert depth.deferring and depth._latest is None
+        assert depth.fps == det.fps
+        # /objects closed: the depth worker takes over again
+        assert wait_for(lambda: (depth.latest(), not det.active)[1], timeout=3)
+        assert wait_for(lambda: depth._latest is not None, timeout=5)
+        assert depth.latest() is depth._latest
+        assert depth.latest().distance_at(320, 240, 8) == pytest.approx(EXPECTED_MM, rel=0.02)
+    finally:
+        depth.stop()
+        det.stop()

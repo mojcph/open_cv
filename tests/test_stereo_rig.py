@@ -55,3 +55,20 @@ def test_pair_dt_ns(running_rig):
     assert wait_for(lambda: rig.latest() is not None)
     assert isinstance(rig.latest().dt_ns, int)
     assert np.isfinite(rig.latest().dt_ns)
+
+
+def test_wait_until_running_ok(running_rig):
+    assert running_rig().wait_until_running(timeout=5) is None
+
+
+def test_wait_until_running_reports_camera_error(running_rig):
+    busy = FakeSource([make_image()], start_error=RuntimeError("Device or resource busy"))
+    msg = running_rig(left=busy).wait_until_running(timeout=5)
+    assert "left camera" in msg and "busy" in msg
+
+
+def test_wait_until_running_times_out():
+    from stereovision.camera import StereoRig
+
+    rig = StereoRig(FakeSource([make_image()]), FakeSource([make_image()]))  # never started
+    assert "did not start" in rig.wait_until_running(timeout=0.3)

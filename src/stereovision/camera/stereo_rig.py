@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -117,6 +118,21 @@ class StereoRig:
                 source.close()
             except Exception as exc:
                 self._set_status(side, f"ERROR closing: {exc}")
+
+    def wait_until_running(self, timeout: float = 20.0) -> str | None:
+        """Block until both cameras deliver frames. Returns None when they do, otherwise a
+        message (a camera reported an error, or they didn't start within timeout)."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            status = self.status()
+            errors = [f"{side} camera: {s.removeprefix('ERROR: ')}"
+                      for side, s in status.items() if s.startswith("ERROR")]
+            if errors:
+                return "; ".join(errors)
+            if all(s == "Running" for s in status.values()):
+                return None
+            time.sleep(0.1)
+        return f"cameras did not start within {timeout:.0f} s (status: {self.status()})"
 
     def status(self) -> dict[str, str]:
         with self._lock:

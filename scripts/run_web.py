@@ -6,7 +6,14 @@ Pages: /  live view,  /calibrate  calibration capture,  /rectified  calibration 
 """
 
 import argparse
+import os
+import socket
+import sys
 from pathlib import Path
+
+# Show only warnings and errors from libcamera (set before picamera2 is imported), so real
+# problems aren't buried in INFO lines.
+os.environ.setdefault("LIBCAMERA_LOG_LEVELS", "*:WARN")
 
 from stereovision.calibration.board import make_board
 from stereovision.calibration.capture import CaptureStore, capture_meta
@@ -65,7 +72,16 @@ def load_detector(cfg):
     return YoloeDetector(path, cfg)
 
 
-def main() -> None:
+def port_in_use(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+        except OSError:
+            return True
+    return False
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("config", nargs="?", default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--captures", type=Path, default=DEFAULT_CAPTURE_DIR,
@@ -74,6 +90,14 @@ def main() -> None:
                         help="stereo calibration file (.npz) for /rectified")
     args = parser.parse_args()
     cfg = load_config(args.config)
+
+    # Check the port BEFORE opening the cameras: if it's taken, another run_web.py is almost
+    # certainly running and holding the cameras too.
+    if port_in_use(cfg.web.host, cfg.web.port):
+        print(f"ERROR: port {cfg.web.port} is already in use - another run_web.py is probably "
+              "still running (and holding the cameras).\n"
+              "Stop it with Ctrl+C in its terminal, or:  pkill -f scripts/run_web.py")
+        return 1
 
     cam = cfg.camera
     left_num, right_num = cam.camera_indices
@@ -95,9 +119,22 @@ def main() -> None:
             detection_worker = DetectionWorker(
                 rig, DepthEngine.from_rectifier(rectifier, cfg.depth), detector
             )
+            # While /objects is open, /depth shows the detection worker's depth maps
+            # instead of computing its own, so detection keeps the CPU to itself.
+            depth_worker.defer_to = detection_worker
     elif cfg.detection.enabled:
         print("Object detection disabled: it needs a calibration for distances")
     rig.start()
+    print("Starting cameras (software sync takes a few seconds)...", flush=True)
+    problem = rig.wait_until_running()
+    if problem:
+        rig.stop()
+        print(f"ERROR: {problem}")
+        if "busy" in problem.lower() or "did not complete" in problem.lower():
+            print("The cameras are in use by another program. Stop it, e.g.:  "
+                  "pkill -f scripts/run_web.py")
+        return 1
+    print("Cameras running and in sync.", flush=True)
     for worker in (depth_worker, detection_worker):
         if worker is not None:
             worker.start()
@@ -113,7 +150,8 @@ def main() -> None:
             if worker is not None:
                 worker.stop()
         rig.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

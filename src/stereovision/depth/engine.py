@@ -101,19 +101,38 @@ class DepthWorker:
 
     Consumers call latest(); the worker pauses when nobody has asked for `idle_s` seconds,
     so depth only costs CPU while a depth page is open.
+
+    `defer_to` is an optional object-detection worker (anything with `active`, `peek()`,
+    `fps` and `error`). While it is active it already computes a depth map for every frame
+    it detects on, so this worker stops computing its own and serves those instead: two
+    depth calculations at once would only fight over the CPU and slow detection down.
     """
 
-    def __init__(self, rig: StereoRig, engine: DepthEngine, idle_s: float = 5.0) -> None:
+    def __init__(self, rig: StereoRig, engine: DepthEngine, idle_s: float = 5.0,
+                 defer_to=None) -> None:
         self.rig = rig
         self.engine = engine
         self.idle_s = idle_s
+        self.defer_to = defer_to
         self._latest: DepthFrame | None = None
         self._last_request = 0.0
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self.fps = 0.0
-        self.error: str | None = None
+        self._fps = 0.0
+        self._error: str | None = None
+
+    @property
+    def deferring(self) -> bool:
+        return self.defer_to is not None and self.defer_to.active
+
+    @property
+    def fps(self) -> float:
+        return self.defer_to.fps if self.deferring else self._fps
+
+    @property
+    def error(self) -> str | None:
+        return self.defer_to.error if self.deferring else self._error
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True, name="depth")
@@ -126,13 +145,18 @@ class DepthWorker:
 
     def latest(self) -> DepthFrame | None:
         self._last_request = time.monotonic()
+        if self.deferring:
+            shared = self.defer_to.peek()
+            if shared is not None:
+                return shared.frame
         with self._lock:
             return self._latest
 
     def _run(self) -> None:
         last_ts = None
         while not self._stop.is_set():
-            if time.monotonic() - self._last_request > self.idle_s:
+            idle = time.monotonic() - self._last_request > self.idle_s
+            if idle or self.deferring:
                 time.sleep(0.1)
                 continue
             pair = self.rig.latest()
@@ -144,11 +168,11 @@ class DepthWorker:
             try:
                 frame = self.engine.compute(pair)
             except Exception as exc:  # show on the page instead of killing the thread
-                self.error = str(exc)
+                self._error = str(exc)
                 time.sleep(0.5)
                 continue
-            self.error = None
+            self._error = None
             elapsed = time.perf_counter() - start
-            self.fps = 0.8 * self.fps + 0.2 * (1.0 / elapsed) if self.fps else 1.0 / elapsed
+            self._fps = 0.8 * self._fps + 0.2 / elapsed if self._fps else 1.0 / elapsed
             with self._lock:
                 self._latest = frame
