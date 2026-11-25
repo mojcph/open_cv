@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import numpy as np
 import pytest
@@ -131,12 +133,29 @@ def test_status_reports_camera_and_picture_rates(running_rig):
     client = create_app(rig).test_client()
     assert wait_for(lambda: client.get("/status").get_json()["camera_fps"] is not None)
     data = client.get("/status").get_json()
-    assert data["camera_fps"] > 0 and data["picture_fps"] == {}
+    assert data["camera_fps"] > 0 and data["pictures"] == {}
     stream = client.get("/video/0", buffered=False)
     chunks = stream.response  # read a few pictures
     for _ in range(3):
         next(chunks)
     stream.close()
-    assert "video" in client.get("/status").get_json()["picture_fps"]
+    assert "video" in client.get("/status").get_json()["pictures"]
     html = client.get("/").get_data(as_text=True)
-    assert "Picture rate" in html and '"video"' in html
+    assert "Picture rate" in html and "Frame delay" in html and '"video"' in html
+
+
+def test_frame_delay_from_sensor_timestamp():
+    from stereovision.web.stream import CAPTURE_CLOCK
+
+    item = {}
+    r = SharedRenderer(lambda: item, lambda it: it["key"], lambda it: (make_image(),))
+    assert r.delay_ms() is None
+    item["key"] = time.clock_gettime_ns(CAPTURE_CLOCK) - 150_000_000  # captured 150 ms ago
+    next(picture_stream(r, 0))
+    assert r.delay_ms() == pytest.approx(150, abs=50)
+
+
+def test_frame_delay_ignores_non_capture_keys():
+    r = SharedRenderer(lambda: {"key": 3}, lambda it: it["key"], lambda it: (make_image(),))
+    next(picture_stream(r, 0))  # key 3 ns is not a recent capture time
+    assert r.delay_ms() is None

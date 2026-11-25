@@ -44,6 +44,7 @@
           <dl class="stats">
             {% if rate_stream is defined %}
             <dt>Picture rate</dt><dd><span id="picture-fps">–</span> fps</dd>
+            <dt>Frame delay</dt><dd><span id="picture-delay">–</span> ms</dd>
             {% endif %}
             {{ stats }}
           </dl>
@@ -57,6 +58,7 @@
       // Header status line: camera state and left/right sync, on every page.
       const rigStatus = document.getElementById("rig-status");
       const pictureFps = document.getElementById("picture-fps");
+      const pictureDelay = document.getElementById("picture-delay");
       const rateStream = {{ (rate_stream if rate_stream is defined else none) | tojson }};
       async function pollStatus() {
         try {
@@ -75,8 +77,9 @@
                                                                                : "status warn";
           }
           if (pictureFps) {
-            const rate = s.picture_fps[rateStream];
-            pictureFps.textContent = rate === undefined ? "–" : rate.toFixed(1);
+            const p = s.pictures[rateStream];  // undefined until this page's stream opened
+            pictureFps.textContent = p ? p.fps.toFixed(1) : "–";
+            pictureDelay.textContent = p && p.delay_ms !== null ? p.delay_ms : "–";
           }
         } catch (e) {
           rigStatus.textContent = "server not reachable";

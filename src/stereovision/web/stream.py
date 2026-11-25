@@ -20,6 +20,15 @@ from flask import Response, abort, current_app, request
 
 T = TypeVar("T")
 
+# Camera sensor timestamps are nanoseconds on this clock (libcamera's SensorTimestamp).
+CAPTURE_CLOCK = time.CLOCK_BOOTTIME
+MAX_PLAUSIBLE_DELAY_MS = 60_000  # keys that aren't capture times (test sources) give nonsense
+
+
+def capture_age_ms(timestamp_ns: int) -> float:
+    """Milliseconds since a frame with this sensor timestamp was captured."""
+    return (time.clock_gettime_ns(CAPTURE_CLOCK) - timestamp_ns) / 1e6
+
 
 def encode_jpeg(image: np.ndarray, jpeg_quality: int = 80) -> bytes | None:
     ok, jpeg = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality])
@@ -35,8 +44,8 @@ def downscale(image: np.ndarray, scale: float) -> np.ndarray:
 class SharedRenderer(Generic[T]):
     """Renders each new item from `source` once; every caller gets the same pictures.
 
-    source() returns the newest item (or None), key(item) identifies it (a timestamp),
-    render(item) returns a tuple of pictures (one per stream).
+    source() returns the newest item (or None), key(item) identifies it (the sensor
+    timestamp of its frame), render(item) returns a tuple of pictures (one per stream).
     """
 
     def __init__(self, source: Callable[[], T | None], key: Callable[[T], int],
@@ -49,6 +58,25 @@ class SharedRenderer(Generic[T]):
         self._pictures: tuple[np.ndarray, ...] = ()
         self.renders = 0  # how many times render() actually ran (for tests/diagnostics)
         self._render_times: deque[float] = deque(maxlen=30)
+        self._delay_ms: float | None = None
+        self._delay_at = 0.0
+
+    def note_sent(self, key: int) -> None:
+        """A stream is sending the picture for `key`: record how old its frame is."""
+        age = capture_age_ms(key)
+        if not 0 <= age <= MAX_PLAUSIBLE_DELAY_MS:
+            return
+        with self._lock:
+            recent = time.monotonic() - self._delay_at < 3.0
+            self._delay_ms = 0.8 * self._delay_ms + 0.2 * age if recent else age
+            self._delay_at = time.monotonic()
+
+    def delay_ms(self, window_s: float = 3.0) -> float | None:
+        """Average age of the pictures sent recently (capture -> sent), or None."""
+        with self._lock:
+            if self._delay_ms is None or time.monotonic() - self._delay_at > window_s:
+                return None
+            return self._delay_ms
 
     def fps(self, window_s: float = 3.0) -> float:
         """New pictures per second over the last window_s seconds (0 when nobody watches)."""
@@ -86,6 +114,7 @@ def picture_stream(renderer: SharedRenderer, index: int, jpeg_quality: int = 80,
         last, pictures = got
         jpeg = encode_jpeg(downscale(pictures[index], scale), jpeg_quality)
         if jpeg is not None:
+            renderer.note_sent(last)
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
         time.sleep(period)
 
@@ -103,7 +132,12 @@ def picture_response(renderer: SharedRenderer, index: int, count: int, jpeg_qual
                     mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
-def picture_rates() -> dict[str, float]:
-    """Picture rate of every stream that has been opened, by stream endpoint."""
+def picture_rates() -> dict[str, dict]:
+    """Picture rate and frame delay (capture -> sent) of every stream opened, by endpoint."""
     renderers = current_app.extensions.get("picture_renderers", {})
-    return {endpoint: round(r.fps(), 1) for endpoint, r in renderers.items()}
+    out = {}
+    for endpoint, r in renderers.items():
+        delay = r.delay_ms()
+        out[endpoint] = {"fps": round(r.fps(), 1),
+                         "delay_ms": None if delay is None else round(delay)}
+    return out

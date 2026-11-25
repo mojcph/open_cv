@@ -55,7 +55,7 @@ def create_app(
     @app.route("/status")
     def camera_status():
         return jsonify(rig.status() | rig.sync_info()
-                       | {"camera_fps": rig.camera_fps(), "picture_fps": picture_rates()})
+                       | {"camera_fps": rig.camera_fps(), "pictures": picture_rates()})
 
     if board is not None and store is not None:
         from stereovision.web.calibrate import create_blueprint
