@@ -265,6 +265,15 @@ details summary {
   cursor: pointer;
 }
 
+.swatch {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.4em;
+  border-radius: 2px;
+  vertical-align: -0.05em;
+}
+
 .table-wrap {
   overflow-x: auto;
 }

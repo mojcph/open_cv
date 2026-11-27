@@ -22,9 +22,14 @@ class MeasuredObject:
 @dataclass(frozen=True)
 class ObjectFrame:
     frame: DepthFrame                 # the frame the detector ran on (rectified left + depth)
-    objects: list[MeasuredObject]
+    objects: list[MeasuredObject]     # nearest first; object number = position + 1
     depth_ms: float
     detect_ms: float
+
+
+def nearest_first(obj: MeasuredObject) -> float:
+    """Sort key: nearest object first, objects without depth last."""
+    return float("inf") if obj.distance_mm is None else obj.distance_mm
 
 
 def measure_objects(frame: DepthFrame, detections: list[Detection]) -> list[MeasuredObject]:
@@ -101,7 +106,8 @@ class DetectionWorker:
             try:
                 frame = self.engine.compute(pair)
                 mid = time.perf_counter()
-                objects = measure_objects(frame, self.detector.detect(frame.left))
+                objects = sorted(measure_objects(frame, self.detector.detect(frame.left)),
+                                 key=nearest_first)
             except Exception as exc:  # show on the page instead of killing the thread
                 self.error = str(exc)
                 time.sleep(0.5)

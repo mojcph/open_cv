@@ -13,7 +13,7 @@ from stereovision.detection import Detection, NullDetector
 from stereovision.detection.null import FixedDetector
 from stereovision.detection.worker import DetectionWorker, MeasuredObject, measure_objects
 from stereovision.detection.yoloe import META, check_export, export_name, export_path
-from stereovision.overlay import draw_objects, format_distance, label_colour
+from stereovision.overlay import draw_objects, format_distance, label_colour, label_hex
 from stereovision.web.app import create_app
 from test_depth import EXPECTED_MM, make_engine, textured_pair
 
@@ -87,6 +87,8 @@ def test_format_distance():
 def test_label_colour_is_stable_and_distinct():
     assert label_colour("cup") == label_colour("cup")
     assert label_colour("cup") != label_colour("person")
+    assert label_colour("car") == (255, 144, 30)  # fixed street colour, BGR
+    assert label_hex("car") == "#1e90ff"
 
 
 def test_draw_objects_keeps_original():
@@ -129,6 +131,8 @@ def test_objects_endpoints(detection_setup):
     assert wait_for(lambda: client.get("/objects/list").get_json()["objects"], timeout=5)
     data = client.get("/objects/list").get_json()
     assert data["objects"][0]["label"] == "cup"
+    assert data["objects"][0]["number"] == 1
+    assert data["objects"][0]["colour"] == label_hex("cup")
     assert data["objects"][0]["distance_mm"] == pytest.approx(EXPECTED_MM, rel=0.02)
     resp = client.get("/objects/video/0")
     assert next(resp.response).startswith(b"--frame\r\nContent-Type: image/jpeg")
@@ -218,3 +222,11 @@ def test_depth_worker_defers_to_active_detection(running_rig):
     finally:
         depth.stop()
         det.stop()
+
+
+def test_nearest_first_puts_missing_depth_last():
+    from stereovision.detection.worker import nearest_first
+
+    objs = [MeasuredObject(Detection(n, 0.9, (0, 0, 1, 1)), mm)
+            for n, mm in [("a", None), ("b", 3000.0), ("c", 1200.0)]]
+    assert [o.detection.label for o in sorted(objs, key=nearest_first)] == ["c", "b", "a"]

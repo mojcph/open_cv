@@ -14,12 +14,13 @@
   <p id="message" class="message error" role="status"></p>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Object</th><th>Distance</th><th>Conf.</th></tr></thead>
-      <tbody id="rows"><tr><td colspan="3">–</td></tr></tbody>
+      <thead><tr><th>No.</th><th>Object</th><th>Distance</th><th>Conf.</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4">–</td></tr></tbody>
     </table>
   </div>
   <p class="small">Looking for: {{ classes }}. Change <code>detection.classes</code> in the
-    config, then re-run <code>scripts/export_detector.py</code>. Distance = straight line from the
+    config, then re-run <code>scripts/export_detector.py</code>. Numbers match the picture,
+    nearest object first; box colours show the object type. Distance = straight line from the
     midpoint between the cameras to the box centre, using the median depth in the middle of
     the box; "no depth" = too little texture, or too close.</p>
 {% endblock %}
@@ -38,13 +39,20 @@
       const rows = document.getElementById("rows");
       rows.replaceChildren(...(r.objects.length ? r.objects : [null]).map((o) => {
         const tr = document.createElement("tr");
-        const cells = o ? [o.label, fmt(o.distance_mm), Math.round(o.confidence * 100) + "%"]
-                        : ["nothing detected", "", ""];
-        for (const text of cells) {
+        const cells = o ? [o.number, o.label, fmt(o.distance_mm),
+                           Math.round(o.confidence * 100) + "%"]
+                        : ["", "nothing detected", "", ""];
+        cells.forEach((text, i) => {
           const td = document.createElement("td");
-          td.textContent = text;
+          if (o && i === 1) {  // colour swatch matching the box on the picture
+            const swatch = document.createElement("span");
+            swatch.className = "swatch";
+            swatch.style.background = o.colour;
+            td.appendChild(swatch);
+          }
+          td.append(String(text));
           tr.appendChild(td);
-        }
+        });
         return tr;
       }));
     } catch (e) { /* server restarting */ }
