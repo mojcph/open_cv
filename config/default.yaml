@@ -56,7 +56,7 @@ depth:
 detection:
   enabled: true
   model: yoloe-26n-seg   # yoloe-26n-seg (~9/s on Pi 5) | yoloe-26s-seg (more reliable, ~4/s)
-  classes: [person, cup, bottle, chair, laptop, keyboard, computer mouse, cell phone, book]
+  classes: [person, cyclist, car, motorcycle, bus, truck]
   imgsz: 640
   confidence: 0.25       # minimum detection score
   models_dir: models

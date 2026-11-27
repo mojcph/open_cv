@@ -72,6 +72,31 @@ def load_detector(cfg):
     return YoloeDetector(path, cfg)
 
 
+def lan_ip() -> str:
+    """This Pi's address on the local network (no packets are sent), or a placeholder."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 80))  # reserved test address; only picks the route
+            return s.getsockname()[0]
+    except OSError:
+        return "<pi-address>"
+
+
+def print_remote_hint(host: str, port: int, local_port: int = 5050) -> None:
+    """Explain how to reach a loopback-only server from another computer.
+
+    Flask's own "Running on http://127.0.0.1:..." line is from the Pi's point of view,
+    so it only works in a browser on the Pi itself.
+    """
+    if host not in ("127.0.0.1", "localhost"):
+        return
+    user = os.environ.get("USER") or "pi"
+    print(f"On this Pi: open http://127.0.0.1:{port}\n"
+          f"From your PC: run  ssh -L {local_port}:127.0.0.1:{port} {user}@{lan_ip()}\n"
+          f"              in PowerShell, keep it open, then open http://127.0.0.1:{local_port}",
+          flush=True)
+
+
 def port_in_use(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # Like the web server itself, ignore connections closed moments ago (TIME_WAIT);
@@ -147,6 +172,7 @@ def main() -> int:
                          rectifier=rectifier,
                          depth_worker=depth_worker, depth_cfg=cfg.depth,
                          detection_worker=detection_worker, model_name=cfg.detection.model)
+        print_remote_hint(cfg.web.host, cfg.web.port)
         app.run(host=cfg.web.host, port=cfg.web.port, threaded=True, use_reloader=False)
     finally:
         for worker in (detection_worker, depth_worker):

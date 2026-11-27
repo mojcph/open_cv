@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_default_detection_config():
     cfg = load_config(DEFAULT_CONFIG_PATH).detection
-    assert cfg.model == "yoloe-26n-seg" and "cup" in cfg.classes
+    assert cfg.model == "yoloe-26n-seg" and "car" in cfg.classes
 
 
 @pytest.mark.parametrize("kw", [{"classes": []}, {"classes": ["cup", "cup"]}, {"imgsz": 100},
