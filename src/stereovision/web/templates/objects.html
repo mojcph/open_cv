@@ -14,13 +14,19 @@
   <p id="message" class="message error" role="status"></p>
   <div class="table-wrap object-list">
     <table>
-      <thead><tr><th>No.</th><th>Object</th><th>Distance</th><th>Conf.</th></tr></thead>
+      <thead><tr>
+        {%- for key, name in [("number", "No."), ("label", "Object"),
+                              ("distance_mm", "Distance"), ("confidence", "Conf.")] %}
+        <th data-key="{{ key }}"><button type="button" class="sort">{{ name }}</button></th>
+        {%- endfor %}
+      </tr></thead>
       <tbody id="rows"><tr><td colspan="4">–</td></tr></tbody>
     </table>
   </div>
   <p class="small">Looking for: {{ classes }}. Change <code>detection.classes</code> in the
     config, then re-run <code>scripts/export_detector.py</code>. Numbers match the picture,
-    nearest object first; box colours show the object type. Distance = straight line from the
+    nearest object first; box colours show the object type. Click a column heading to
+    sort by it, again to reverse. Distance = straight line from the
     midpoint between the cameras to the box centre, using the median depth in the middle of
     the box; "no depth" = too little texture, or too close.</p>
 {% endblock %}
@@ -31,30 +37,67 @@
     return mm >= 1000 ? (mm / 1000).toFixed(2) + " m" : Math.round(mm) + " mm";
   }
 
+  // Sorting: click a heading to sort by it, click again to reverse. Each column starts in
+  // its most useful direction (confidence: highest first). Ties fall back to the number.
+  const FIRST_DIR = {number: 1, label: 1, distance_mm: 1, confidence: -1};
+  let sortKey = "number";
+  let sortDir = 1;
+  let objects = [];
+
+  function compare(a, b) {
+    const x = a[sortKey], y = b[sortKey];
+    if (x === y) return a.number - b.number;
+    if (x === null) return 1;  // no depth always last
+    if (y === null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir;
+  }
+
+  for (const th of document.querySelectorAll("th[data-key]")) {
+    th.querySelector("button").addEventListener("click", () => {
+      const key = th.dataset.key;
+      sortDir = key === sortKey ? -sortDir : FIRST_DIR[key];
+      sortKey = key;
+      render();
+    });
+  }
+
+  function render() {
+    for (const th of document.querySelectorAll("th[data-key]")) {
+      if (th.dataset.key === sortKey) {
+        th.setAttribute("aria-sort", sortDir > 0 ? "ascending" : "descending");
+      } else {
+        th.removeAttribute("aria-sort");
+      }
+    }
+    const rows = document.getElementById("rows");
+    const sorted = [...objects].sort(compare);
+    rows.replaceChildren(...(sorted.length ? sorted : [null]).map((o) => {
+      const tr = document.createElement("tr");
+      const cells = o ? [o.number, o.label, fmt(o.distance_mm),
+                         Math.round(o.confidence * 100) + "%"]
+                      : ["", "nothing detected", "", ""];
+      cells.forEach((text, i) => {
+        const td = document.createElement("td");
+        if (o && i === 1) {  // colour swatch matching the box on the picture
+          const swatch = document.createElement("span");
+          swatch.className = "swatch";
+          swatch.style.background = o.colour;
+          td.appendChild(swatch);
+        }
+        td.append(String(text));
+        tr.appendChild(td);
+      });
+      return tr;
+    }));
+  }
+
   async function poll() {
     try {
       const r = await (await fetch("{{ url_for('objects.list_objects') }}")).json();
       document.getElementById("fps").textContent = r.fps;
       document.getElementById("message").textContent = r.error || "";
-      const rows = document.getElementById("rows");
-      rows.replaceChildren(...(r.objects.length ? r.objects : [null]).map((o) => {
-        const tr = document.createElement("tr");
-        const cells = o ? [o.number, o.label, fmt(o.distance_mm),
-                           Math.round(o.confidence * 100) + "%"]
-                        : ["", "nothing detected", "", ""];
-        cells.forEach((text, i) => {
-          const td = document.createElement("td");
-          if (o && i === 1) {  // colour swatch matching the box on the picture
-            const swatch = document.createElement("span");
-            swatch.className = "swatch";
-            swatch.style.background = o.colour;
-            td.appendChild(swatch);
-          }
-          td.append(String(text));
-          tr.appendChild(td);
-        });
-        return tr;
-      }));
+      objects = r.objects;
+      render();
     } catch (e) { /* server restarting */ }
     setTimeout(poll, 500);
   }
