@@ -283,6 +283,27 @@ table {
   width: 100%;
 }
 
+/* Objects table: fixed height so the panel doesn't jump as objects come and go; the rows
+   scroll and the column headings stay at the top. */
+.object-list {
+  height: 15rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.object-list thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--border);  /* the border scrolls away on sticky cells */
+}
+
+.object-list td {
+  font-variant-numeric: tabular-nums;
+}
+
 th,
 td {
   padding: 0.3rem 0.5rem;
