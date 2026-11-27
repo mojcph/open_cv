@@ -88,6 +88,21 @@
         setTimeout(pollStatus, 1000);
       }
       pollStatus();
+
+      // Give each picture its aspect ratio (--ar) once the stream's first frame arrives, so
+      // the CSS can scale it to the window height. MJPEG streams don't reliably fire "load".
+      function setAspect() {
+        let pending = false;
+        for (const img of document.querySelectorAll(".feed")) {
+          if (img.naturalWidth && img.naturalHeight) {
+            img.style.setProperty("--ar", img.naturalWidth / img.naturalHeight);
+          } else {
+            pending = true;
+          }
+        }
+        if (pending) setTimeout(setAspect, 250);
+      }
+      setAspect();
     </script>
     {% block scripts %}{% endblock %}
   </body>

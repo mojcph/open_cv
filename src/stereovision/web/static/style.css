@@ -94,13 +94,14 @@ code {
   min-width: 0;
 }
 
-/* Scale each picture to fit its column AND the window height, keeping the aspect ratio.
-   Only the display shrinks; the stream keeps its resolution. */
+/* Scale each picture to fill its column but stay within the window height, keeping the
+   aspect ratio (--ar = width / height, set from the stream by base.html). The picture may be
+   shown larger than the stream's resolution; only the display scales, not the stream. */
 .feed {
+  --feed-max-h: calc(100vh - var(--header-h) - 4.5rem);
   display: block;
-  max-width: 100%;
-  max-height: calc(100vh - var(--header-h) - 4.5rem);
-  width: auto;
+  width: 100%;
+  max-width: calc(var(--feed-max-h) * var(--ar, 1.3333));
   height: auto;
   margin: 0 auto;
   background: #000;
@@ -168,7 +169,7 @@ code {
   }
 
   .feed {
-    max-height: none;
+    max-width: 100%;
   }
 }
 
