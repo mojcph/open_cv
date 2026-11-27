@@ -25,13 +25,14 @@ class CameraConfig:
     lens_position: float | None = 1.0
     sync: bool = True
     max_pair_dt_ms: float = 5.0
+    match_exposure: bool = True  # right camera copies the left's exposure and white balance
 
     def __post_init__(self) -> None:
         if self.rotation not in ROTATIONS:
             raise ValueError(f"rotation must be one of {ROTATIONS}, got {self.rotation!r}")
         if self.width <= 0 or self.height <= 0:
             raise ValueError("width and height must be positive")
-        for name in ("swap_left_right", "sync"):
+        for name in ("swap_left_right", "sync", "match_exposure"):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be true or false")
         if len(self.sensor_size) != 2 or min(self.sensor_size) <= 0:

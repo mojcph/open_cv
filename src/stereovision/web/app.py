@@ -6,6 +6,7 @@ import cv2
 from flask import Flask, jsonify, render_template, request, url_for
 
 from stereovision.calibration.capture import CaptureStore
+from stereovision.camera.exposure import ExposureLink
 from stereovision.camera.stereo_rig import StereoFrame, StereoRig
 from stereovision.config import DepthConfig
 from stereovision.depth.engine import DepthWorker
@@ -17,6 +18,15 @@ from stereovision.web.stream import SharedRenderer, picture_rates, picture_respo
 def pair_renderer(rig: StereoRig, render) -> SharedRenderer[StereoFrame]:
     """SharedRenderer over the rig's newest synchronised pair."""
     return SharedRenderer(rig.latest, lambda pair: pair.left.timestamp_ns, render)
+
+
+def exposure_status(link: ExposureLink | None) -> dict | None:
+    """Shared exposure for /status: time in ms and analogue gain, or None if not shared."""
+    values = None if link is None else link.latest()
+    if values is None:
+        return None
+    return {"exposure_ms": round(values["ExposureTime"] / 1000, 1),
+            "gain": round(values["AnalogueGain"], 2)}
 
 
 def create_app(
@@ -31,6 +41,7 @@ def create_app(
     detection_worker: DetectionWorker | None = None,
     model_name: str = "",
     max_fps: float | None = None,
+    exposure_link: ExposureLink | None = None,
 ) -> Flask:
     """board + store enable /calibrate; rectifier /rectified; depth_worker /depth;
     detection_worker /objects. Pages that aren't enabled don't exist (404)."""
@@ -55,7 +66,8 @@ def create_app(
     @app.route("/status")
     def camera_status():
         return jsonify(rig.status() | rig.sync_info()
-                       | {"camera_fps": rig.camera_fps(), "pictures": picture_rates()})
+                       | {"camera_fps": rig.camera_fps(), "pictures": picture_rates(),
+                          "exposure": exposure_status(exposure_link)})
 
     if board is not None and store is not None:
         from stereovision.web.calibrate import create_blueprint

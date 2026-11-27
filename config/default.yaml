@@ -18,6 +18,11 @@ camera:
   max_pair_dt_ms: 5      # drop left/right pairs further apart than this.
                          # With sync: ~0.02 ms typical. Without sync use ~20 (half a frame).
 
+  # Exposure: the left camera runs auto exposure + auto white balance; with match_exposure
+  # the right camera copies its exposure time, gain and colour gains, so both pictures
+  # look alike (better stereo matching). false = each camera adjusts on its own.
+  match_exposure: true
+
 web:
   host: 127.0.0.1
   port: 5000

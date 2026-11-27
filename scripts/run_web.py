@@ -18,6 +18,7 @@ os.environ.setdefault("LIBCAMERA_LOG_LEVELS", "*:WARN")
 from stereovision.calibration.board import make_board
 from stereovision.calibration.capture import CaptureStore, capture_meta
 from stereovision.calibration.io import camera_mismatch, load_calibration
+from stereovision.camera.exposure import ExposureLink
 from stereovision.camera.picam import PicamSource
 from stereovision.camera.stereo_rig import StereoRig
 from stereovision.config import DEFAULT_CONFIG_PATH, CameraConfig, load_config
@@ -31,7 +32,9 @@ DEFAULT_CAPTURE_DIR = ROOT / "calibration" / "captures"
 DEFAULT_CALIBRATION = ROOT / "calibration" / "stereo.npz"
 
 
-def make_source(cam: CameraConfig, camera_num: int, sync_role: str) -> PicamSource:
+def make_source(cam: CameraConfig, camera_num: int, sync_role: str,
+                exposure_link: ExposureLink | None = None) -> PicamSource:
+    """sync_role "server" = left camera (also exposure leader), "client" = right camera."""
     return PicamSource(
         camera_num,
         cam.width,
@@ -40,6 +43,8 @@ def make_source(cam: CameraConfig, camera_num: int, sync_role: str) -> PicamSour
         frame_rate=cam.frame_rate,
         lens_position=cam.lens_position,
         sync=sync_role if cam.sync else "off",
+        exposure_link=exposure_link,
+        exposure_role="leader" if sync_role == "server" else "follower",
     )
 
 
@@ -129,9 +134,10 @@ def main() -> int:
 
     cam = cfg.camera
     left_num, right_num = cam.camera_indices
+    exposure_link = ExposureLink() if cam.match_exposure else None
     rig = StereoRig(
-        make_source(cam, left_num, "server"),
-        make_source(cam, right_num, "client"),
+        make_source(cam, left_num, "server", exposure_link),
+        make_source(cam, right_num, "client", exposure_link),
         rotation=cam.rotation,
         max_pair_dt_ns=int(cam.max_pair_dt_ms * 1e6),
     )
@@ -171,7 +177,8 @@ def main() -> int:
                          preview_scale=cfg.web.preview_scale, max_fps=cfg.web.max_fps,
                          rectifier=rectifier,
                          depth_worker=depth_worker, depth_cfg=cfg.depth,
-                         detection_worker=detection_worker, model_name=cfg.detection.model)
+                         detection_worker=detection_worker, model_name=cfg.detection.model,
+                         exposure_link=exposure_link)
         print_remote_hint(cfg.web.host, cfg.web.port)
         app.run(host=cfg.web.host, port=cfg.web.port, threaded=True, use_reloader=False)
     finally:

@@ -65,11 +65,13 @@
           const s = await (await fetch("{{ url_for('camera_status') }}")).json();
           const running = s.left === "Running" && s.right === "Running";
           const fps = s.camera_fps === null ? "" : ` · ${s.camera_fps} fps`;
+          // Shared exposure: a high gain means little light, so noisier pictures and depth.
+          const exp = s.exposure ? ` · ${s.exposure.exposure_ms} ms × ${s.exposure.gain}` : "";
           if (running && s.in_sync) {
-            rigStatus.textContent = `cameras in sync · Δ ${s.pair_dt_ms} ms${fps}`;
+            rigStatus.textContent = `cameras in sync · Δ ${s.pair_dt_ms} ms${fps}${exp}`;
             rigStatus.className = "status ok";
           } else if (running) {
-            rigStatus.textContent = `out of sync · Δ ${s.pair_dt_ms} ms${fps}`;
+            rigStatus.textContent = `out of sync · Δ ${s.pair_dt_ms} ms${fps}${exp}`;
             rigStatus.className = "status warn";
           } else {
             rigStatus.textContent = `left: ${s.left} · right: ${s.right}`;

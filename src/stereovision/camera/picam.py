@@ -8,6 +8,7 @@ from libcamera import controls
 from picamera2 import Picamera2
 
 from stereovision.camera.base import Frame
+from stereovision.camera.exposure import ExposureLink
 
 SYNC_MODES = {
     "off": None,
@@ -21,6 +22,9 @@ class PicamSource:
 
     With sync="server"/"client", libcamera software sync aligns the frame timing of two
     cameras. read() skips frames until the camera reports SyncReady.
+
+    With an exposure_link, the "leader" publishes its auto exposure / white balance and the
+    "follower" copies them, so both pictures have the same brightness and colour.
     """
 
     def __init__(
@@ -34,9 +38,13 @@ class PicamSource:
         sync: str = "off",
         sync_timeout_s: float = 10.0,
         buffer_count: int = 4,
+        exposure_link: ExposureLink | None = None,
+        exposure_role: str = "leader",
     ) -> None:
         if sync not in SYNC_MODES:
             raise ValueError(f"sync must be one of {list(SYNC_MODES)}, got {sync!r}")
+        if exposure_role not in ("leader", "follower"):
+            raise ValueError(f"exposure_role must be leader or follower, got {exposure_role!r}")
         self.camera_num = camera_num
         self.size = (width, height)
         self.sensor_size = tuple(sensor_size)
@@ -47,6 +55,9 @@ class PicamSource:
         self.buffer_count = buffer_count
         self._camera: Picamera2 | None = None
         self._synced = False
+        self.exposure_link = exposure_link
+        self.exposure_role = exposure_role
+        self._applied_exposure: dict | None = None  # follower: what it last copied
 
     def _controls(self) -> dict:
         frame_us = round(1e6 / self.frame_rate)
@@ -75,6 +86,7 @@ class PicamSource:
             raise
         self._camera = camera
         self._synced = self.sync == "off"
+        self._applied_exposure = None
 
     def read(self) -> Frame:
         if self._camera is None:
@@ -84,6 +96,7 @@ class PicamSource:
             request = self._camera.capture_request()
             try:
                 metadata = request.get_metadata()
+                self._share_exposure(metadata)
                 if not self._synced:
                     if not metadata.get("SyncReady", False):
                         if time.monotonic() > deadline:
@@ -97,6 +110,19 @@ class PicamSource:
             finally:
                 request.release()
             return Frame(image=image, timestamp_ns=int(metadata["SensorTimestamp"]))
+
+    def _share_exposure(self, metadata: dict) -> None:
+        link = self.exposure_link
+        if link is None:
+            return
+        if self.exposure_role == "leader":
+            link.publish(metadata)
+            return
+        ctrl = link.follower_controls(self._applied_exposure)
+        if ctrl is not None:
+            # Takes effect a few frames later; until then the pictures may differ slightly.
+            self._camera.set_controls(ctrl)
+            self._applied_exposure = ctrl
 
     def close(self) -> None:
         if self._camera is None:

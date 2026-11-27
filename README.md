@@ -161,6 +161,8 @@ plus a table sorted by distance.
 
 ## Configuration — `config/default.yaml`
 
+For what each setting trades off, accuracy by distance, and suggested settings for a desk or a street scene, see [src/stereovision/README.md](src/stereovision/README.md).
+
 | Key | Meaning |
 |-----|---------|
 | `camera.width`, `camera.height` | Capture size, before rotation |
@@ -172,6 +174,7 @@ plus a table sorted by distance.
 | `camera.lens_position` | Manual focus in dioptres = 1 / distance in m (`1.0` = 1 m, `0` = infinity). `null` = autofocus, which breaks calibration. |
 | `camera.sync` | `true` = libcamera software sync. The left camera is the server, the right the client. |
 | `camera.max_pair_dt_ms` | Drop left/right pairs further apart than this. Use `5` with sync, about `20` without. |
+| `camera.match_exposure` | `true` = the right camera copies the left camera's auto exposure, gain and white balance, so both pictures look alike. |
 | `web.host`, `web.port`, `web.jpeg_quality` | Web server settings |
 | `web.preview_scale` | Size of the browser stream (0.5 = half). Capture and processing always use full resolution. |
 | `web.max_fps` | Frame-rate limit per picture in the browser (default 10). At 30 fps, one live picture is about 8 Mbit/s through the SSH tunnel, enough to make VS Code's connection drop. |
